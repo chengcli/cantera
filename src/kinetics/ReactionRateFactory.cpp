@@ -16,6 +16,7 @@
 #include "cantera/kinetics/InterfaceRate.h"
 #include "cantera/kinetics/PlogRate.h"
 #include "cantera/kinetics/TwoTempPlasmaRate.h"
+#include "cantera/kinetics/FreezingRate.h"
 
 namespace Cantera
 {
@@ -97,6 +98,13 @@ ReactionRateFactory::ReactionRateFactory()
     // StickingBlowersMaselRate evaluator
     reg("sticking-Blowers-Masel", [](const AnyMap& node, const UnitStack& rate_units) {
         return new StickingBlowersMaselRate(node, rate_units);
+    });
+
+    // Freezing evaluator
+    std::cout << "I'm here" << std::endl;
+    reg("freezing", [](const AnyMap& node, const UnitStack& rate_units) {
+        std::cout << "I'm registed" << std::endl;
+        return new FreezingRate(node, rate_units);
     });
 }
 
