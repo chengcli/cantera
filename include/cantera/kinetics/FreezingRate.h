@@ -10,29 +10,22 @@ namespace Cantera
 
 struct FreezingData: public ReactionData
 {
-  FreezingData(): freezing_rate_(0.), temperature_(0.)
-  {}
-
-  virtual void update(double T) override;
-
-  virtual void update(double T, double P) override;
-
   virtual bool update(const ThermoPhase& phase, const Kinetics& kin) override;
-
   using ReactionData::update;
-
-protected:
-  double freezing_rate_;
-  double temperature_;
 };
 
 class FreezingRate final : public ReactionRate
 {
 public:
-  FreezingRate();
+  // access data
+  double freezing_rate;
+  double freezing_temperature;
 
-  FreezingRate(const AnyMap& node, const UnitStack& rate_units={}) : 
-    FreezingRate()
+  // functions
+  FreezingRate(): freezing_rate(0.), freezing_temperature(0.)
+  {}
+
+  FreezingRate(const AnyMap& node, const UnitStack& rate_units={})
   {
       setParameters(node, rate_units);
   }
@@ -46,10 +39,7 @@ public:
   
   void setParameters(const AnyMap& node, const UnitStack& rate_units);
 
-  void getParameters(AnyMap& rateNode, const Units& rate_units) const;
-  void getParameters(AnyMap& rateNode) const {
-      return getParameters(rateNode, Units(0));
-  }
+  void getParameters(AnyMap& node) const;
 
   //! Update information specific to reaction
   /*!
@@ -63,8 +53,15 @@ public:
    */
   double evalFromStruct(const FreezingData& shared_data);
 
-  //! Set up Freezing object
-  //void setRates(const std::multimap<double, ArrheniusRate>& rates);
+  //! Evaluate derivative of reaction rate with respect to temperature
+  //! divided by reaction rate
+  /*!
+   *  @param shared_data  data shared by all reactions of a given type
+   */
+  double ddTScaledFromStruct(const FreezingData& shared_data) const;
+
+  //! Check basic syntax and settings of reaction rate expression
+  void check(const std::string& equation);
 
   //! Check to make sure that the rate expression is finite over a range of
   //! temperatures at each interpolation pressure. This is potentially an
