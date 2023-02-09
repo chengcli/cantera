@@ -17,6 +17,9 @@
 #include "cantera/kinetics/PlogRate.h"
 #include "cantera/kinetics/TwoTempPlasmaRate.h"
 #include "cantera/kinetics/FreezingRate.h"
+#include "cantera/kinetics/CondensationRate.h"
+#include "cantera/kinetics/AutoconversionRate.h"
+#include "cantera/kinetics/EvaporationRate.h"
 
 namespace Cantera
 {
@@ -103,8 +106,26 @@ ReactionRateFactory::ReactionRateFactory()
     // Freezing evaluator
     std::cout << "I'm here" << std::endl;
     reg("freezing", [](const AnyMap& node, const UnitStack& rate_units) {
-        std::cout << "I'm registed" << std::endl;
+        std::cout << "freezing registed" << std::endl;
         return new FreezingRate(node, rate_units);
+    });
+
+    // Condensation evaluator
+    reg("condensation", [](const AnyMap& node, const UnitStack& rate_units) {
+        std::cout << "condensation registed" << std::endl;
+        return new CondensationRate(node, rate_units);
+    });
+
+    // Autoconversion evaluator
+    reg("autoconversion", [](const AnyMap& node, const UnitStack& rate_units) {
+        std::cout << "autoconversion registed" << std::endl;
+        return new AutoconversionRate(node, rate_units);
+    });
+
+    // Evaporation evaluator
+    reg("evaporation", [](const AnyMap& node, const UnitStack& rate_units) {
+        std::cout << "evaporation registed" << std::endl;
+        return new EvaporationRate(node, rate_units);
     });
 }
 

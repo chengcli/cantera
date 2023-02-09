@@ -27,7 +27,7 @@ public:
 
   FreezingRate(const AnyMap& node, const UnitStack& rate_units={})
   {
-      setParameters(node, rate_units);
+    setParameters(node, rate_units);
   }
 
   unique_ptr<MultiRateBase> newMultiRate() const {

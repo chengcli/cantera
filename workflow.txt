@@ -1,0 +1,37 @@
+# ReactionData
+
+# MultiRate
+|- MultiRateBase -> MultiRate<RateType, DataType>
+|--> (DataType) MultiRate::m_shared
+|--> std::vector<std::pair<size_t, RateType>> m_rxn_rates
+|--> |- update(ThermoPhase, Kinetics)
+|    |--> m_shared.update(ThermoPhase, Kinetics)
+|    |--> _update() [if has ReactionRate::updateFromStruct]
+|
+|--> |- _update()
+|    |--> {v : m_rxn_rates}, v->second.updateFromStruct [if defined]
+|
+|--> |- getRateConstants(double*)
+|    |--> evalFromStruct(m_shared)
+|
+|--> |- resize(nSpecies, nReactions, nPhases)
+     |--> m_shared.resize(nSpecies, nReactions, nPhases)
+
+# workflow to calculate the reaction rate
+|- GasKinetics::processFwdRateCoefficients(double* ropf)
+|--> |- GasKinetics::update_rates_C() // Update properties that depend on concentrations.
+|    |------------------------------
+|    |--> BulkKinetics::m_act_conc  // Activity concentration
+|    |--> BulkKinetics::m_phys_conc  // Physical concentration
+|    |------------------------------> They are calcualted by funcitons in ThermoPhase
+|    |--> |- BulkKinetics::m_multi_concm (ThirdBodyCalculator)
+|    |    |--> BulkKinetics::m_concm // ThirdBody concentrations
+|    |    |--> m_multi_concm.update(m_phys_conc, ctot, m_concm.data())
+|    |--> BulkKinetics::m_ROP_ok = false
+|
+|--> |- GasKinetics::update_rates_T() // update properties that depend on temperature
+     |--> {v : BulkKinetics::m_bulk_rates}, v->update(thermo(), this) // update(ThermoPhase, Kinetics)
+     |--> {v : BulkKinetics::m_bulk_rates}, v->getRateConstants(Kinetics::m_rfn.data())
+     |--> BulkKinetics::m_temp = thermo().temperature() // last temperature at which rates were evaluated
+     |--> GasKinetics::m_pres = thermo().pressure()     // last pressure at which rates were evaluated
+ 
