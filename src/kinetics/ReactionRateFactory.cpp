@@ -111,7 +111,7 @@ ReactionRateFactory::ReactionRateFactory()
     });
 
     // Condensation evaluator
-    reg("condensation", [](const AnyMap& node, const UnitStack& rate_units) {
+    reg("interface-condensation", [](const AnyMap& node, const UnitStack& rate_units) {
         std::cout << "condensation registed" << std::endl;
         return new CondensationRate(node, rate_units);
     });
@@ -123,7 +123,7 @@ ReactionRateFactory::ReactionRateFactory()
     });
 
     // Evaporation evaluator
-    reg("evaporation", [](const AnyMap& node, const UnitStack& rate_units) {
+    reg("interface-evaporation", [](const AnyMap& node, const UnitStack& rate_units) {
         std::cout << "evaporation registed" << std::endl;
         return new EvaporationRate(node, rate_units);
     });

@@ -23,6 +23,7 @@ class MultiRate final : public MultiRateBase
     CT_DEFINE_HAS_MEMBER(has_ddT, ddTScaledFromStruct)
     CT_DEFINE_HAS_MEMBER(has_ddP, perturbPressure)
     CT_DEFINE_HAS_MEMBER(has_ddM, perturbThirdBodies)
+    CT_DEFINE_HAS_MEMBER(has_activity, getActivityConcentration)
 
 public:
     virtual std::string type() override {
@@ -68,6 +69,10 @@ public:
         for (auto& rxn : m_rxn_rates) {
             kf[rxn.first] = rxn.second.evalFromStruct(m_shared);
         }
+    }
+
+    virtual void getActivityConcentration(double* actConc, double const* conc) override {
+        _get_activity(actConc, conc);
     }
 
     virtual void processRateConstants_ddT(double* rop,
@@ -130,6 +135,24 @@ public:
     }
 
 protected:
+    //! Helper function to process updates for rate types that implement the
+    //! `getActivityConcentration` method.
+    template <typename T=RateType,
+        typename std::enable_if<has_activity<T>::value, bool>::type = true>
+    void _get_activity(double *actConc, double const *conc) {
+        for (auto& rxn : m_rxn_rates) {
+          rxn.second.getActivityConcentration(actConc, conc, m_shared);
+        }
+    }
+
+    //! Helper function for rate types that do not implement `getActivityConcentration`.
+    //! Does nothing, but exists to allow generic implementations of
+    //getActivityConcentration().
+    template <typename T=RateType,
+        typename std::enable_if<!has_activity<T>::value, bool>::type = true>
+    void _get_activity(double *actConc, double const *conc) {
+    }
+
     //! Helper function to process updates for rate types that implement the
     //! `updateFromStruct` method.
     template <typename T=RateType,

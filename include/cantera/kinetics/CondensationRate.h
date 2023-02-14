@@ -11,67 +11,31 @@ namespace Cantera
 struct CondensationData: public ReactionData
 {
   CondensationData():
-    ready(false), pressure(-1)
+    ready(false)
   {}
-
-  void update(double T) override {
-    throw CanteraError("CondensationData::update",
-        "Missing state information: 'CondensationData' requires pressure.");
-  }
-
-  void update(double T, double P) override {
-    ReactionData::update(T);
-    pressure = P;
-  }
 
   using ReactionData::update;
 
   bool update(const ThermoPhase& phase, const Kinetics& kin) override;
 
   void resize(size_t nSpecies, size_t nReactions, size_t nPhases) override {
-    mole_fractions.resize(nSpecies, 0.);
+    std::cout << "I'm resizing" << std::endl;
+    std::cout << "nSpecies = " << nSpecies << std::endl;
+    std::cout << "nReactions = " << nReactions << std::endl;
+    std::cout << "nPhases = " << nPhases << std::endl;
+    phase_temperatures.resize(nPhases, 0.);
     ready = true;
   }
 
-  void restore() override {
-    ReactionData::restore();
-
-    // only restore if there is a valid buffered value
-    if (m_pressure_buf < 0.) {
-        return;
-    }
-    update(temperature, m_pressure_buf);
-    m_pressure_buf = -1.;
-  }
-
-  virtual void invalidateCache() override {
-    ReactionData::invalidateCache();
-    pressure = NAN;
-  }
-
-  void perturbPressure(double deltaP)
-  {
-    if (m_pressure_buf > 0.) {
-      throw CanteraError("CondensationData::perturbPressure",
-      "Cannot apply another perturbation as state is already perturbed.");
-    }
-    m_pressure_buf = pressure;
-    update(temperature, pressure * (1. + deltaP));
-  }
-
   bool      ready; //!< boolean indicating whether vectors are accessible
-  double    pressure;
-  vector_fp mole_fractions;
-
-protected:
-  double m_pressure_buf; //!< buffered pressure
+  vector_fp phase_temperatures;
 };
 
 class CondensationRate : public ReactionRate
 {
 public:
   CondensationRate(const AnyMap& node, const UnitStack& rate_units = {}):
-    m_vapor_index(-1), m_A(0.), m_p(0.), m_a(0.), m_b(0.)
+    m_vapor_index(-1), m_solid_index(-1), m_A(0.), m_P3(0.), m_T3(1.), m_beta(0.), m_gamma(0.), m_ice(false)
   {
     setParameters(node, rate_units);
   }
@@ -86,21 +50,27 @@ public:
 
   void setContext(const Reaction& rxn, const Kinetics& kin) override;
 
+  void getActivityConcentration(double *actConc, double const* conc,
+    CondensationData const& shared_data);
+
   double evalFromStruct(const CondensationData& shared_data);
 
-  // general saturation vapor pressure expressed as
+  // ideal saturation vapor pressure
   double saturation_vapor_pressure(double T) {
-    return m_p*exp(m_a - m_b/T);
+    return m_P3*exp((1. - m_T3/T)*m_beta - m_gamma*log(T/m_T3));
   }
 
 protected:
   void getParameters(AnyMap& node) const override;
 
   int    m_vapor_index;
+  int    m_solid_index;
   double m_A;  // condensation rate
-  double m_p;
-  double m_a;
-  double m_b;
+  double m_P3;
+  double m_T3;
+  double m_beta;
+  double m_gamma;
+  bool   m_ice;
 };
 
 }

@@ -51,6 +51,8 @@ public:
     //! @param kf  array of rate constants
     virtual void getRateConstants(double* kf) = 0;
 
+    virtual void getActivityConcentration(double* actConc, double const* conc) {}
+
     //! Evaluate all rate constant temperature derivatives handled by the evaluator;
     //! which are multiplied with the array of rate-of-progress variables.
     //! Depending on the implementation of a rate object, either an exact derivative or

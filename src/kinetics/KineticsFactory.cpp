@@ -9,6 +9,7 @@
 #include "cantera/kinetics/GasKinetics.h"
 #include "cantera/kinetics/InterfaceKinetics.h"
 #include "cantera/kinetics/EdgeKinetics.h"
+#include "cantera/kinetics/MultiPhaseKinetics.h"
 #include "cantera/thermo/ThermoPhase.h"
 #include "cantera/base/stringUtils.h"
 
@@ -33,6 +34,10 @@ KineticsFactory::KineticsFactory() {
     addAlias("surface", "surf");
     reg("edge", []() { return new EdgeKinetics(); });
     addAlias("edge", "Edge");
+    reg("multiphase", []() { return new MultiPhaseKinetics(); });
+    addAlias("multiphase", "MultiPhase");
+    addAlias("multiphase", "Phase");
+    addAlias("multiphase", "phase");
 }
 
 Kinetics* KineticsFactory::newKinetics(const string& model)
