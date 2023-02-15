@@ -18,7 +18,7 @@
 #include "cantera/kinetics/TwoTempPlasmaRate.h"
 #include "cantera/kinetics/FreezingRate.h"
 #include "cantera/kinetics/CondensationRate.h"
-#include "cantera/kinetics/AutoconversionRate.h"
+#include "cantera/kinetics/CoagulationRate.h"
 #include "cantera/kinetics/EvaporationRate.h"
 
 namespace Cantera
@@ -116,10 +116,10 @@ ReactionRateFactory::ReactionRateFactory()
         return new CondensationRate(node, rate_units);
     });
 
-    // Autoconversion evaluator
-    reg("autoconversion", [](const AnyMap& node, const UnitStack& rate_units) {
-        std::cout << "autoconversion registed" << std::endl;
-        return new AutoconversionRate(node, rate_units);
+    // Coagulation evaluator
+    reg("coagulation", [](const AnyMap& node, const UnitStack& rate_units) {
+        std::cout << "coagulation registed" << std::endl;
+        return new CoagulationRate(node, rate_units);
     });
 
     // Evaporation evaluator

@@ -9,7 +9,8 @@
 #include "cantera/kinetics/GasKinetics.h"
 #include "cantera/kinetics/InterfaceKinetics.h"
 #include "cantera/kinetics/EdgeKinetics.h"
-#include "cantera/kinetics/MultiPhaseKinetics.h"
+#include "cantera/kinetics/NucleationKinetics.h"
+#include "cantera/kinetics/EvaporationKinetics.h"
 #include "cantera/thermo/ThermoPhase.h"
 #include "cantera/base/stringUtils.h"
 
@@ -34,10 +35,12 @@ KineticsFactory::KineticsFactory() {
     addAlias("surface", "surf");
     reg("edge", []() { return new EdgeKinetics(); });
     addAlias("edge", "Edge");
-    reg("multiphase", []() { return new MultiPhaseKinetics(); });
-    addAlias("multiphase", "MultiPhase");
-    addAlias("multiphase", "Phase");
-    addAlias("multiphase", "phase");
+    reg("nucleation", []() { return new NucleationKinetics(); });
+    addAlias("nucleation", "condensation");
+    addAlias("nucleation", "nuc");
+    reg("evaporation", []() { return new EvaporationKinetics(); });
+    addAlias("evaporation", "evap");
+    addAlias("evaporation", "sublimation");
 }
 
 Kinetics* KineticsFactory::newKinetics(const string& model)
