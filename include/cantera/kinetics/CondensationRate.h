@@ -19,10 +19,6 @@ struct CondensationData: public ReactionData
   bool update(const ThermoPhase& phase, const Kinetics& kin) override;
 
   void resize(size_t nSpecies, size_t nReactions, size_t nPhases) override {
-    std::cout << "I'm resizing" << std::endl;
-    std::cout << "nSpecies = " << nSpecies << std::endl;
-    std::cout << "nReactions = " << nReactions << std::endl;
-    std::cout << "nPhases = " << nPhases << std::endl;
     phase_temperatures.resize(nPhases, 0.);
     ready = true;
   }

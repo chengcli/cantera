@@ -104,7 +104,6 @@ ReactionRateFactory::ReactionRateFactory()
     });
 
     // Freezing evaluator
-    std::cout << "I'm here" << std::endl;
     reg("freezing", [](const AnyMap& node, const UnitStack& rate_units) {
         std::cout << "freezing registed" << std::endl;
         return new FreezingRate(node, rate_units);
