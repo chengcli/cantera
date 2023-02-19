@@ -46,7 +46,7 @@ public:
 
   void setContext(const Reaction& rxn, const Kinetics& kin) override;
 
-  void getActivityConcentration(double *actConc, double const* conc,
+  void reviseActivityConcentration(double *actConc, double const* conc,
     CondensationData const& shared_data);
 
   double evalFromStruct(const CondensationData& shared_data);

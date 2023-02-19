@@ -23,7 +23,7 @@ class MultiRate final : public MultiRateBase
     CT_DEFINE_HAS_MEMBER(has_ddT, ddTScaledFromStruct)
     CT_DEFINE_HAS_MEMBER(has_ddP, perturbPressure)
     CT_DEFINE_HAS_MEMBER(has_ddM, perturbThirdBodies)
-    CT_DEFINE_HAS_MEMBER(has_activity, getActivityConcentration)
+    CT_DEFINE_HAS_MEMBER(has_activity, reviseActivityConcentration)
 
 public:
     virtual std::string type() override {
@@ -71,8 +71,8 @@ public:
         }
     }
 
-    virtual void getActivityConcentration(double* actConc, double const* conc) override {
-        _get_activity(actConc, conc);
+    virtual void reviseActivityConcentration(double* actConc, double const* conc) override {
+        _revise_activity(actConc, conc);
     }
 
     virtual void processRateConstants_ddT(double* rop,
@@ -136,21 +136,21 @@ public:
 
 protected:
     //! Helper function to process updates for rate types that implement the
-    //! `getActivityConcentration` method.
+    //! `reviseActivityConcentration` method.
     template <typename T=RateType,
         typename std::enable_if<has_activity<T>::value, bool>::type = true>
-    void _get_activity(double *actConc, double const *conc) {
+    void _revise_activity(double *actConc, double const *conc) {
         for (auto& rxn : m_rxn_rates) {
-          rxn.second.getActivityConcentration(actConc, conc, m_shared);
+          rxn.second.reviseActivityConcentration(actConc, conc, m_shared);
         }
     }
 
-    //! Helper function for rate types that do not implement `getActivityConcentration`.
+    //! Helper function for rate types that do not implement `reviseActivityConcentration`.
     //! Does nothing, but exists to allow generic implementations of
-    //getActivityConcentration().
+    //! reviseActivityConcentration().
     template <typename T=RateType,
         typename std::enable_if<!has_activity<T>::value, bool>::type = true>
-    void _get_activity(double *actConc, double const *conc) {
+    void _revise_activity(double *actConc, double const *conc) {
     }
 
     //! Helper function to process updates for rate types that implement the
