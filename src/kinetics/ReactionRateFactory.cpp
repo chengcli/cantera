@@ -105,25 +105,21 @@ ReactionRateFactory::ReactionRateFactory()
 
     // Freezing evaluator
     reg("freezing", [](const AnyMap& node, const UnitStack& rate_units) {
-        std::cout << "freezing registed" << std::endl;
         return new FreezingRate(node, rate_units);
     });
 
     // Condensation evaluator
     reg("interface-condensation", [](const AnyMap& node, const UnitStack& rate_units) {
-        std::cout << "condensation registed" << std::endl;
         return new CondensationRate(node, rate_units);
     });
 
     // Coagulation evaluator
     reg("coagulation", [](const AnyMap& node, const UnitStack& rate_units) {
-        std::cout << "coagulation registed" << std::endl;
         return new CoagulationRate(node, rate_units);
     });
 
     // Evaporation evaluator
     reg("interface-evaporation", [](const AnyMap& node, const UnitStack& rate_units) {
-        std::cout << "evaporation registed" << std::endl;
         return new EvaporationRate(node, rate_units);
     });
 }
