@@ -1,9 +1,13 @@
-/**
- * @file Photolysis.h
- */
+//! @file Photolysis.h
 
 #ifndef CT_PHOTOLYSIS_H
 #define CT_PHOTOLYSIS_H
+
+#include "cantera/base/ct_defs.h"
+#include "cantera/base/Units.h"
+#include "cantera/kinetics/ReactionData.h"
+#include "ReactionRate.h"
+#include "MultiRate.h"
 
 int locate(double const *xx, double x, int n);
 
@@ -22,13 +26,7 @@ class Kinetics;
  * @ingroup reactionGroup
  */
 struct PhotolysisData : public ReactionData {
-  enum {
-    IABSORB = 0,
-    IDISSOC = 1,
-    IIONIZE = 2
-  };
-
-  PhotolysisData();
+  bool check() const;
 
   bool update(const ThermoPhase& thermo, const Kinetics& kin) override;
   using ReactionData::update;
@@ -55,18 +53,23 @@ class PhotolysisBase : public ReactionRate {
   /*!
    * @param temp Temperature grid
    * @param wavelength Wavelength grid
+   * @param branches Branch strings of the photolysis reaction
    * @param cross_section Cross-section data
    */
   PhotolysisBase(vector<double> const& temp, vector<double> const& wavelength,
-                 vector<vector<double>> const& cross_section);
+                 vector<std::string> const& branches,
+                 vector<double> const& cross_section);
 
   //! Constructor based on AnyValue content
-  PhotolysisBase(AnyValue const& rate, UnitSystem& units,
-                 UnitStack& rate_units);
-
   explicit PhotolysisBase(AnyMap const& node, UnitStack const& rate_units={});
 
   void setParameters(AnyMap const& node, UnitStack const& rate_units) override;
+
+  void setRateParameters(const AnyValue& rate, vector<string> const& branches);
+
+  void loadCrossSectionVulcan(vector<string> files, string const& branch);
+
+  void loadCrossSectionKinetics7(vector<string> files, string const& branch);
 
   void getParameters(AnyMap& node) const override;
 
@@ -75,6 +78,9 @@ class PhotolysisBase : public ReactionRate {
   void validate(const string& equation, const Kinetics& kin) override;
 
  protected:
+  //! composition of branches
+  vector<Composition> m_branch;
+
   //! number of temperature grid points
   size_t m_ntemp;
 
@@ -86,9 +92,10 @@ class PhotolysisBase : public ReactionRate {
 
   //! \brief photolysis cross-section data
   //!
-  //! The cross-section data is a two dimensional table of size (ntemp, nwave, 3).
-  //! Each row contains the wavelength, photo-absorption cross-section
-  //! photo-dissociation cross-section, and photo-ionization cross-section.
+  //! The cross-section data is a three dimensional table of size (ntemp, nwave, nbranch).
+  //! The first dimension is the number of temperature grid points, the second dimension
+  //! is the number of wavelength grid points, and the third dimension is the number of
+  //! branches of the photolysis reaction.
   //! Default units are nanometers, cm^2, cm^2, and cm^2, respectively.
   vector<double> m_crossSection;
 };
@@ -117,30 +124,53 @@ class PhotolysisRate : public PhotolysisBase {
     return "Photolysis";
   }
 
-  double evalFromStruct(PhotolysisData const& data) const {
+  double evalFromStruct(PhotolysisData const& data) {
     double wmin = m_temp_wave_grid[m_ntemp];
     double wmax = m_temp_wave_grid.back();
 
     int iwmin = locate(data.wavelength.data(), wmin, data.wavelength.size());
     int iwmax = locate(data.wavelength.data(), wmax, data.wavelength.size());
 
-    double cross1, cross2;
-    double coord[2] = {data.temperature, data.actinicFlux[iwmin]};
+    double* cross1 = new double [m_branch.size()];
+    double* cross2 = new double [m_branch.size()];
+
+    double coord[2] = {data.temperature, data.wavelength[iwmin]};
     size_t len[2] = {m_ntemp, m_nwave};
 
-    interpn(&cross1, coord, m_crossSection.data(), m_temp_wave_grid.data(), len, 2, 1);
+    interpn(cross1, coord, m_crossSection.data(), m_temp_wave_grid.data(),
+        len, 2, m_branch.size());
 
-    double rate = 0.;
+    double total_rate = 0.0;
+    for (auto& [name, stoich] : m_net_products)
+      stoich = 0.0;
+
     for (int i = iwmin; i < iwmax; i++) {
       coord[1] = data.actinicFlux[i+1];
-      interpn(&cross2, coord, m_crossSection.data(), m_temp_wave_grid.data(), len, 2, 1);
-      rate += 0.5 * (cross1 * data.actinicFlux[i] + cross2 * data.actinicFlux[i+1]) 
-                  * (data.wavelength[i+1] - data.wavelength[i]);
-      cross1 = cross2;
+      interpn(cross2, coord, m_crossSection.data(), m_temp_wave_grid.data(),
+          len, 2, m_branch.size());
+
+      for (size_t n = 0; n < m_branch.size(); n++) {
+        double rate = 0.5 * (data.wavelength[i+1] - data.wavelength[i])
+          * (cross1[n] * data.actinicFlux[i] + cross2[n] * data.actinicFlux[i+1]);
+        for (auto const& [name, stoich] : m_branch[n])
+          m_net_products[name] += rate * stoich;
+        total_rate += rate;
+        cross1[n] = cross2[n];
+      }
     }
 
-    return rate;
+    for (auto& [name, stoich] : m_net_products)
+      stoich /= total_rate;
+
+    delete [] cross1;
+    delete [] cross2;
+
+    return total_rate;
   }
+
+ protected:
+  //! net stoichiometric coefficients of products
+  Composition m_net_products;
 };
 
 }
