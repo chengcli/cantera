@@ -5,6 +5,11 @@
 #ifndef CT_PHOTOLYSIS_H
 #define CT_PHOTOLYSIS_H
 
+int locate(double const *xx, double x, int n);
+
+void interpn(double *val, double const *coor, double const *data,
+             double const *axis, size_t const *len, int ndim, int nval);
+
 namespace Cantera
 {
 
@@ -37,6 +42,7 @@ struct PhotolysisData : public ReactionData {
   //! \brief actinic flux
   //!
   //! The actinic flux is a vector of size nwave.
+  //! Default units are photons cm^-2 s^-1 nm^-1.
   vector<double> actinicFlux;
 };
 
@@ -69,11 +75,14 @@ class PhotolysisBase : public ReactionRate {
   void validate(const string& equation, const Kinetics& kin) override;
 
  protected:
-  //! temperature grid
-  vector<double> m_temp_grid;
+  //! number of temperature grid points
+  size_t m_ntemp;
 
-  //! wavelength grid
-  vector<double> m_wave_grid;
+  //! number of wavelength grid points
+  size_t m_nwave;
+
+  //! temperature grid followed by wavelength grid
+  vector<double> m_temp_wave_grid;
 
   //! \brief photolysis cross-section data
   //!
@@ -108,10 +117,30 @@ class PhotolysisRate : public PhotolysisBase {
     return "Photolysis";
   }
 
-  double evalFromStruct(PhotolysisData const& shared_data) const;
+  double evalFromStruct(PhotolysisData const& data) const {
+    double wmin = m_temp_wave_grid[m_ntemp];
+    double wmax = m_temp_wave_grid.back();
 
- protected:
-  vector<double> m_curent_crossSection;
+    int iwmin = locate(data.wavelength.data(), wmin, data.wavelength.size());
+    int iwmax = locate(data.wavelength.data(), wmax, data.wavelength.size());
+
+    double cross1, cross2;
+    double coord[2] = {data.temperature, data.actinicFlux[iwmin]};
+    size_t len[2] = {m_ntemp, m_nwave};
+
+    interpn(&cross1, coord, m_crossSection.data(), m_temp_wave_grid.data(), len, 2, 1);
+
+    double rate = 0.;
+    for (int i = iwmin; i < iwmax; i++) {
+      coord[1] = data.actinicFlux[i+1];
+      interpn(&cross2, coord, m_crossSection.data(), m_temp_wave_grid.data(), len, 2, 1);
+      rate += 0.5 * (cross1 * data.actinicFlux[i] + cross2 * data.actinicFlux[i+1]) 
+                  * (data.wavelength[i+1] - data.wavelength[i]);
+      cross1 = cross2;
+    }
+
+    return rate;
+  }
 };
 
 }
