@@ -290,6 +290,7 @@ addTestProgram('clib', 'clib')
 addTestProgram('equil', 'equil')
 addTestProgram('general', 'general')
 addTestProgram('kinetics', 'kinetics')
+addTestProgram('photochem', 'photochem')
 addTestProgram('oneD', 'oneD')
 addTestProgram('thermo', 'thermo')
 addTestProgram('thermo_consistency', 'thermo-consistency',
