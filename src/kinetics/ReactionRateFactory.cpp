@@ -100,7 +100,7 @@ ReactionRateFactory::ReactionRateFactory()
         return new StickingBlowersMaselRate(node, rate_units);
     });
 
-    // Photolysis evaluator
+    // PhotolysisRate evaluator
     reg("photolysis", [](const AnyMap& node, const UnitStack& rate_units) {
         return new PhotolysisRate(node, rate_units);
     });

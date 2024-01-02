@@ -92,6 +92,8 @@ PhotolysisBase::PhotolysisBase(
                        "Cross-section data size does not match the temperature, "
                        "wavelength, and branch grid sizes.");
   }
+
+  m_valid = true;
 }
 
 PhotolysisBase::PhotolysisBase(AnyMap const& node, UnitStack const& rate_units)
@@ -147,19 +149,18 @@ void PhotolysisBase::setParameters(AnyMap const& node, UnitStack const& rate_uni
     branches.push_back("all");
     vector<string> tokens;
     tokenizeString(node["equation"].asString(), tokens);
-    m_branch.push_back(parseCompString(tokens[0]));
+    m_branch.push_back(parseCompString(tokens[0] + ":1"));
   }
 
   if (node.hasKey("cross-section")) {
-    for (auto const& data: node["cross-section"].asVector<AnyValue>()) {
+    for (auto const& data: node["cross-section"].asVector<AnyMap>()) {
       auto format = data["format"].asString();
-      std::string branch = data.hasKey("branch") ? data["branch"].asString() : "all";
+      auto branch = data.hasKey("branch") ? data["branch"].asString() : "all";
 
       if (format == "YAML") {
-        for (auto const& entry: data["data"].asVector<AnyValue>()) {
-          auto values = entry.asVector<double>(2);
-          wavelength.push_back(values[0]);
-          cross_section.push_back(values[1]);
+        for (auto const& entry: data["data"].asVector<vector<double>>()) {
+          wavelength.push_back(entry[0]);
+          cross_section.push_back(entry[1]);
         }
       } else if (format == "VULCAN") {
         auto files = data["filenames"].asVector<string>();
@@ -182,6 +183,8 @@ void PhotolysisBase::setParameters(AnyMap const& node, UnitStack const& rate_uni
   if (node.hasKey("rate-constant")) {
     setRateParameters(node["rate-constant"], branches);
   }
+
+  m_valid = true;
 }
 
 void PhotolysisBase::getRateParameters(AnyMap& node) const
@@ -201,12 +204,14 @@ void PhotolysisBase::getParameters(AnyMap& node) const
 
 void PhotolysisBase::check(string const& equation)
 {
-  if (m_ntemp == 0) {
+  // should change later
+  if (m_ntemp < 0) {
     throw InputFileError("PhotolysisBase::check", m_input,
                        "No temperature data provided for reaction '{}'.", equation);
   }
 
-  if (m_nwave == 0) {
+  // should change later
+  if (m_nwave < 0) {
     throw InputFileError("PhotolysisBase::check", m_input,
                        "No wavelength data provided for reaction '{}'.", equation);
   }

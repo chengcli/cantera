@@ -1,25 +1,41 @@
 #include "gtest/gtest.h"
+#include "cantera/thermo/ThermoFactory.h"
+#include "cantera/kinetics/KineticsFactory.h"
 
-using namespace Cantera;
+namespace Cantera
+{
 
-class PhotochemFromScratch: public testing::Test {
+class PhotochemTitan: public testing::Test {
  public:
-  PhotochemFromScratch() {
-    // set the initial state
-    p1.setState_TPX(1200.0, 5.0*OneAtm, "H2:1.0, O2:1.0");
-    p1.equilibrate("TP");
-    p1.save("h2o2.xml","tran",false);
-    p1.save("h2o2.cti","cti",false);
-  }
+  // data
+  shared_ptr<ThermoPhase> phase;
+  shared_ptr<Kinetics> kin;
 
-  shared_ptr<ThermoPhase> p1;
-  BulkKinetics kin;
+  // constructor
+  PhotochemTitan() {
+    phase = newThermo("../data/ch4_photolysis.yaml");
+    kin = newKinetics({phase}, "../data/ch4_photolysis.yaml");
+
+    // set the initial state
+    string X = "CH4:0.02 N2:0.98";
+    phase->setState_TPX(200.0, OneAtm, X);
+  }
 };
 
-TEST_F(PhotochemFromScratch, build) {
-  IdealGasMix p2("h2o2.xml","tran");
-  p2.setState_TPX(1200.0, 5.0*OneAtm, "H2:1.0, O2:1.0");
-  p2.equilibrate("TP");
-  p2.save("h2o2.xml","tran",false);
-  p2.save("h2o2.cti","cti",false);
+TEST_F(PhotochemTitan, check_phase) {
+  ASSERT_EQ(phase->nElements(), 3);
+  ASSERT_EQ(phase->nSpecies(), 8);
+}
+
+} // namespace Cantera
+
+int main(int argc, char** argv)
+{
+  printf("Running main() from PhotochemTitan.cpp\n");
+  Cantera::make_deprecation_warnings_fatal();
+  Cantera::printStackTraceOnSegfault();
+  testing::InitGoogleTest(&argc, argv);
+  int result = RUN_ALL_TESTS();
+  Cantera::appdelete();
+  return result;
 }
