@@ -24,6 +24,8 @@ if env['googletest'] == 'submodule':
 if env['googletest'] != 'none':
     localenv.Append(LIBS=['gtest', 'gmock'])
 
+localenv.Append(LIBS=['stdc++fs'])
+
 # Turn off optimization to speed up compilation
 ccflags = localenv['CCFLAGS']
 for optimize_flag in ('-O3', '-O2', '/O2'):

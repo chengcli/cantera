@@ -9,10 +9,13 @@
 #include "ReactionRate.h"
 #include "MultiRate.h"
 
-int locate(double const *xx, double x, int n);
+inline int locate(double const *xx, double x, int n) {
+  return 0;
+}
 
-void interpn(double *val, double const *coor, double const *data,
-             double const *axis, size_t const *len, int ndim, int nval);
+inline void interpn(double *val, double const *coor, double const *data,
+             double const *axis, size_t const *len, int ndim, int nval) {
+}
 
 namespace Cantera
 {
@@ -72,6 +75,8 @@ class PhotolysisBase : public ReactionRate {
   void loadCrossSectionKinetics7(vector<string> files, string const& branch);
 
   void getParameters(AnyMap& node) const override;
+
+  void getRateParameters(AnyMap& node) const;
 
   void check(string const& equation) override;
 

@@ -184,4 +184,48 @@ void PhotolysisBase::setParameters(AnyMap const& node, UnitStack const& rate_uni
   }
 }
 
+void PhotolysisBase::getRateParameters(AnyMap& node) const
+{
+  node.setFlowStyle();
+}
+
+void PhotolysisBase::getParameters(AnyMap& node) const
+{
+  AnyMap rateNode;
+  getRateParameters(rateNode);
+
+  if (!rateNode.empty()) {
+    node["rate-constant"] = std::move(rateNode);
+  }
+}
+
+void PhotolysisBase::check(string const& equation)
+{
+  if (m_ntemp == 0) {
+    throw InputFileError("PhotolysisBase::check", m_input,
+                       "No temperature data provided for reaction '{}'.", equation);
+  }
+
+  if (m_nwave == 0) {
+    throw InputFileError("PhotolysisBase::check", m_input,
+                       "No wavelength data provided for reaction '{}'.", equation);
+  }
+}
+
+void PhotolysisBase::validate(string const& equation, Kinetics const& kin)
+{
+  if (!valid()) {
+    throw InputFileError("PhotolysisBase::validate", m_input,
+                       "Rate object for reaction '{}' is not configured.", equation);
+  }
+}
+
+void __attribute__((weak)) PhotolysisBase::loadCrossSectionVulcan(vector<string> files,
+                                                                  string const& branch)
+{}
+
+void __attribute__((weak)) PhotolysisBase::loadCrossSectionKinetics7(vector<string> files,
+                                                                     string const& branch)
+{}
+
 }
