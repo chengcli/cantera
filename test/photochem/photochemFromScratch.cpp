@@ -27,6 +27,12 @@ TEST_F(PhotochemTitan, check_phase) {
   ASSERT_EQ(phase->nSpecies(), 8);
 }
 
+TEST_F(PhotochemTitan, check_kinetics) {
+  ASSERT_EQ(kin->nReactions(), 2);
+  ASSERT_EQ(kin->nTotalSpecies(), 8);
+  ASSERT_EQ(kin->nPhases(), 1);
+}
+
 } // namespace Cantera
 
 int main(int argc, char** argv)

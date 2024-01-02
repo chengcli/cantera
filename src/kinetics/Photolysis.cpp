@@ -68,8 +68,8 @@ bool PhotolysisData::check() const
 PhotolysisBase::PhotolysisBase(
     vector<double> const& temp, vector<double> const& wavelength,
     vector<std::string> const& branches,
-    vector<double> const& cross_section):
-  m_crossSection(cross_section)
+    vector<double> const& xsection):
+  m_crossSection(xsection)
 {
   m_ntemp = temp.size();
   m_nwave = wavelength.size();
@@ -136,7 +136,7 @@ void PhotolysisBase::setParameters(AnyMap const& node, UnitStack const& rate_uni
   vector<string> branches;
   vector<double> temperature;
   vector<double> wavelength;
-  vector<double> cross_section;
+  vector<double> xsection;
 
   ReactionRate::setParameters(node, rate_units);
 
@@ -156,11 +156,28 @@ void PhotolysisBase::setParameters(AnyMap const& node, UnitStack const& rate_uni
     for (auto const& data: node["cross-section"].asVector<AnyMap>()) {
       auto format = data["format"].asString();
       auto branch = data.hasKey("branch") ? data["branch"].asString() : "all";
+      auto temp = data["temperature-range"].asVector<double>(2, 2);
+      if (temp[0] >= temp[1]) {
+        throw CanteraError("PhotolysisBase::setParameters",
+                           "Temperature range must be strictly increasing.");
+      }
+
+      if (temperature.empty()) {
+        temperature = temp;
+      } else {
+        if (temperature.back() < temp.front()) {
+          throw CanteraError("PhotolysisBase::setParameters",
+                             "Temperature ranges has gap in between.");
+        }
+
+        temperature.pop_back();
+        temperature.insert(temperature.end(), temp.begin(), temp.end());
+      }
 
       if (format == "YAML") {
         for (auto const& entry: data["data"].asVector<vector<double>>()) {
           wavelength.push_back(entry[0]);
-          cross_section.push_back(entry[1]);
+          xsection.push_back(entry[1]);
         }
       } else if (format == "VULCAN") {
         auto files = data["filenames"].asVector<string>();
@@ -178,7 +195,7 @@ void PhotolysisBase::setParameters(AnyMap const& node, UnitStack const& rate_uni
   m_ntemp = temperature.size();
   m_nwave = wavelength.size();
   m_temp_wave_grid.resize(m_ntemp + m_nwave);
-  m_crossSection = cross_section;
+  m_crossSection = xsection;
 
   if (node.hasKey("rate-constant")) {
     setRateParameters(node["rate-constant"], branches);
@@ -204,10 +221,9 @@ void PhotolysisBase::getParameters(AnyMap& node) const
 
 void PhotolysisBase::check(string const& equation)
 {
-  // should change later
-  if (m_ntemp < 0) {
+  if (m_ntemp < 2) {
     throw InputFileError("PhotolysisBase::check", m_input,
-                       "No temperature data provided for reaction '{}'.", equation);
+                       "Insufficient temperature data provided for reaction '{}'.", equation);
   }
 
   // should change later

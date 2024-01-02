@@ -57,11 +57,11 @@ class PhotolysisBase : public ReactionRate {
    * @param temp Temperature grid
    * @param wavelength Wavelength grid
    * @param branches Branch strings of the photolysis reaction
-   * @param cross_section Cross-section data
+   * @param xsection Cross-section data
    */
   PhotolysisBase(vector<double> const& temp, vector<double> const& wavelength,
                  vector<std::string> const& branches,
-                 vector<double> const& cross_section);
+                 vector<double> const& xsection);
 
   //! Constructor based on AnyValue content
   explicit PhotolysisBase(AnyMap const& node, UnitStack const& rate_units={});
