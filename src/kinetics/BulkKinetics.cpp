@@ -700,4 +700,11 @@ void BulkKinetics::assertDerivativesValid(const string& name)
     }
 }
 
+void __attribute__((weak)) BulkKinetics::updateActinicFlux(void *rt_solver)
+{
+    double *flux = reinterpret_cast<double*>(rt_solver);
+    m_actinicFlux.assign(flux, flux + m_wavelength.size());
+    m_hasNewActinicFlux = true;
+}
+
 }
