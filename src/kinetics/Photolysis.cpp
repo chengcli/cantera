@@ -262,9 +262,43 @@ void PhotolysisBase::validate(string const& equation, Kinetics const& kin)
   }
 }
 
-void __attribute__((weak)) PhotolysisBase::loadCrossSectionVulcan(vector<string> files,
-                                                                  string const& branch)
-{}
+void PhotolysisBase::loadCrossSectionVulcan(vector<string> files,
+                                            string const& branch)
+{
+  fstream inFile;
+  inFile.open(VULCAN_ID); 
+
+  string wavlength;
+  string photoabs;
+  string photodiss;
+  string photoion; 
+
+  int num = 0;
+  int rows = 0;
+
+  while (getline(inFile, wavlength))
+    rows++;
+
+  inFile.close();
+  
+  Eigen::MatrixXd Output(2, rows-1);
+  inFile.open(VULCAN_ID); 
+  getline(inFile,wavlength);
+
+  while(getline(inFile,wavlength, ',')){
+    getline(inFile,photoabs,',');
+    getline(inFile,photodiss,',');
+    getline(inFile,photoion,'\n');
+  
+    Output(0, num) = atof(wavlength.c_str());
+    Output(1, num) = atof(photoion.c_str());
+  
+    num++;
+  }
+  inFile.close();
+  
+  return Output;
+}
 
 void __attribute__((weak)) PhotolysisBase::loadCrossSectionKinetics7(vector<string> files,
                                                                      string const& branch)
