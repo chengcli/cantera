@@ -1,5 +1,6 @@
 //! @file Photolysis.cpp
 
+#include "cantera/kinetics/Kinetics.h"
 #include "cantera/kinetics/Photolysis.h"
 #include "cantera/thermo/ThermoPhase.h"
 #include "cantera/base/stringUtils.h"
@@ -16,17 +17,26 @@ bool PhotolysisData::update(const ThermoPhase& thermo, const Kinetics& kin)
     changed = true;
   }
 
+  if (wavelength.empty()) {
+    size_t nwave = kin.nWavelengths();
+
+    wavelength.resize(nwave);
+    actinicFlux.resize(nwave);
+
+    kin.getWavelength(wavelength.data());
+    kin.getActinicFlux(actinicFlux.data());
+    changed = true;
+  } else if (kin.hasNewActinicFlux()) {
+    kin.getActinicFlux(actinicFlux.data());
+    changed = true;
+  }
+
   return changed;
 }
 
 bool PhotolysisData::check() const
 {
     // Check that the wavelength grid is valid
-    if (wavelength.empty()) {
-        throw CanteraError("PhotolysisData::update",
-                           "Wavelength grid is empty.");
-    }
-
     if (wavelength.size() < 2) {
         throw CanteraError("PhotolysisData::update",
                            "Wavelength grid must have at least two points.");
@@ -195,7 +205,18 @@ void PhotolysisBase::setParameters(AnyMap const& node, UnitStack const& rate_uni
   m_ntemp = temperature.size();
   m_nwave = wavelength.size();
   m_temp_wave_grid.resize(m_ntemp + m_nwave);
+
+  for (size_t i = 0; i < m_ntemp; i++) {
+    m_temp_wave_grid[i] = temperature[i];
+  }
+
+  for (size_t i = 0; i < m_nwave; i++) {
+    m_temp_wave_grid[m_ntemp + i] = wavelength[i];
+  }
+
+  // only works for one temperature range
   m_crossSection = xsection;
+  m_crossSection.insert(m_crossSection.end(), xsection.begin(), xsection.end());
 
   if (node.hasKey("rate-constant")) {
     setRateParameters(node["rate-constant"], branches);
