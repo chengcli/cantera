@@ -64,11 +64,10 @@ class PhotolysisBase : public ReactionRate {
 
   void setParameters(AnyMap const& node, UnitStack const& rate_units) override;
 
-  void setRateParameters(const AnyValue& rate, vector<string> const& branches);
-
-  void loadCrossSectionVulcan(vector<string> files, string const& branch);
-
-  void loadCrossSectionKinetics7(vector<string> files, string const& branch);
+  //! Set the rate parameters for each branch
+  //! @param rate Rate coefficient data
+  //! @param branch_map Map of branch names to branch indices
+  void setRateParameters(const AnyValue& rate, map<string, int> const& branch_map);
 
   void getParameters(AnyMap& node) const override;
 
@@ -189,6 +188,26 @@ class PhotolysisRate : public PhotolysisBase {
   //! net stoichiometric coefficients of products
   Composition m_net_products;
 };
+
+/**
+ * Read the cross-section data from VULCAN format files
+ *
+ * @param files Vector of filenames.
+ * There are two files for each photolysis reaction. The first one is for
+ * cross-section data and the second one for the branch ratios.
+ */
+void load_xsection_vulcan(vector<string> const& files,
+                          vector<Composition> const& branches,
+                          vector<double>& wavelength,
+                          vector<double>& xsection);
+
+/**
+ * Read the cross-section data from KINETICS7 format files
+ */
+void load_xsection_kinetics7(vector<string> const& files, 
+                             vector<Composition> const& branches,
+                             vector<double>& wavelength,
+                             vector<double>& xsection);
 
 }
 

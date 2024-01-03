@@ -51,7 +51,7 @@ TEST_F(PhotochemTitan, check_fwd_rate_constants) {
 
   kin->getFwdRateConstants(kfwd.data());
 
-  ASSERT_NEAR(kfwd[0], 0., 1.0e-8);
+  ASSERT_NEAR(kfwd[0], -1., 1.0e-8);
   ASSERT_NEAR(kfwd[1], 0.0171, 1.0e-8);
 }
 

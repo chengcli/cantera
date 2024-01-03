@@ -69,9 +69,9 @@ reactions:
     - name: b5  # 0.2
       product: "CH:1 H2:1 H:1"
   cross-section:
-    - format: VULCAN
+    - format: KINETICS7
       temperature-range: [0., 300.]
-      filenames: [CH4_cross.csv, CH4_branch.csv]
+      filenames: [../data/cross/CH4.dat]
   rate-constants:
     resolution: 0.1
     scale:
