@@ -10,6 +10,7 @@ __pycache__
 *.exe.manifest
 build/
 test/work/
+test/data/cross
 include/cantera/base/config.h
 include/cantera/base/config.h.build
 include/cantera/base/system.h.gch

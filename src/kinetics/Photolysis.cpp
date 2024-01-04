@@ -76,7 +76,8 @@ bool PhotolysisData::check() const
 }
 
 PhotolysisBase::PhotolysisBase(
-    vector<double> const& temp, vector<double> const& wavelength,
+    vector<double> const& temp, 
+    vector<double> const& wavelength,
     vector<std::string> const& branches,
     vector<double> const& xsection):
   m_crossSection(xsection)
@@ -111,7 +112,8 @@ PhotolysisBase::PhotolysisBase(AnyMap const& node, UnitStack const& rate_units)
   setParameters(node, rate_units);
 }
 
-void PhotolysisBase::setRateParameters(const AnyValue& rate, vector<string> const& branches)
+void PhotolysisBase::setRateParameters(AnyValue const& rate, 
+                                       map<string, int> const& branch_map)
 {
   if (rate.hasKey("resolution")) {
     double resolution = rate["resolution"].asDouble();
@@ -129,13 +131,13 @@ void PhotolysisBase::setRateParameters(const AnyValue& rate, vector<string> cons
       }
     } else {
       for (auto const& [branch, scale] : rate["scale"].as<AnyMap>()) {
-        auto b = std::find(branches.begin(), branches.end(), branch);
-        if (b == branches.end()) {
+        auto it = branch_map.find(branch);
+        if (it == branch_map.end()) {
           throw CanteraError("PhotolysisBase::setRateParameters",
                              "Branch '{}' not found", branch);
         }
 
-        scales[b - branches.begin()] = scale.asDouble();
+        scales[it->second] = scale.asDouble();
       }
     }
   }
@@ -143,20 +145,18 @@ void PhotolysisBase::setRateParameters(const AnyValue& rate, vector<string> cons
 
 void PhotolysisBase::setParameters(AnyMap const& node, UnitStack const& rate_units)
 {
-  vector<string> branches;
+  map<string, int> branch_map;
+  pair<vector<double>, vector<double>> result;
   vector<double> temperature;
-  vector<double> wavelength;
-  vector<double> xsection;
 
   ReactionRate::setParameters(node, rate_units);
 
   if (node.hasKey("branches")) {
     for (auto const& branch : node["branches"].asVector<AnyMap>()) {
-      branches.push_back(branch["name"].asString());
+      branch_map[branch["name"].asString()] = m_branch.size();
       m_branch.push_back(parseCompString(branch["product"].asString()));
     } 
   } else {
-    branches.push_back("all");
     vector<string> tokens;
     tokenizeString(node["equation"].asString(), tokens);
     m_branch.push_back(parseCompString(tokens[0] + ":1"));
@@ -165,7 +165,6 @@ void PhotolysisBase::setParameters(AnyMap const& node, UnitStack const& rate_uni
   if (node.hasKey("cross-section")) {
     for (auto const& data: node["cross-section"].asVector<AnyMap>()) {
       auto format = data["format"].asString();
-      auto branch = data.hasKey("branch") ? data["branch"].asString() : "all";
       auto temp = data["temperature-range"].asVector<double>(2, 2);
       if (temp[0] >= temp[1]) {
         throw CanteraError("PhotolysisBase::setParameters",
@@ -186,21 +185,24 @@ void PhotolysisBase::setParameters(AnyMap const& node, UnitStack const& rate_uni
 
       if (format == "YAML") {
         for (auto const& entry: data["data"].asVector<vector<double>>()) {
-          wavelength.push_back(entry[0]);
-          xsection.push_back(entry[1]);
+          result.first.push_back(entry[0]);
+          result.second.push_back(entry[1]);
         }
       } else if (format == "VULCAN") {
         auto files = data["filenames"].asVector<string>();
-        loadCrossSectionVulcan(files, branch);
+        result = load_xsection_vulcan(files, m_branch);
       } else if (format == "KINETICS7") {
         auto files = data["filenames"].asVector<string>();
-        loadCrossSectionKinetics7(files, branch);
+        result = load_xsection_kinetics7(files, m_branch);
       } else {
         throw CanteraError("PhotolysisBase::setParameters",
                            "Invalid cross-section format '{}'.", format);
       }
     }
   }
+
+  vector<double> &wavelength(result.first);
+  vector<double> &xsection(result.second);
 
   m_ntemp = temperature.size();
   m_nwave = wavelength.size();
@@ -219,7 +221,7 @@ void PhotolysisBase::setParameters(AnyMap const& node, UnitStack const& rate_uni
   m_crossSection.insert(m_crossSection.end(), xsection.begin(), xsection.end());
 
   if (node.hasKey("rate-constant")) {
-    setRateParameters(node["rate-constant"], branches);
+    setRateParameters(node["rate-constant"], branch_map);
   }
 
   m_valid = true;
@@ -261,13 +263,5 @@ void PhotolysisBase::validate(string const& equation, Kinetics const& kin)
                        "Rate object for reaction '{}' is not configured.", equation);
   }
 }
-
-void __attribute__((weak)) PhotolysisBase::loadCrossSectionVulcan(vector<string> files,
-                                                                  string const& branch)
-{}
-
-void __attribute__((weak)) PhotolysisBase::loadCrossSectionKinetics7(vector<string> files,
-                                                                     string const& branch)
-{}
 
 }
