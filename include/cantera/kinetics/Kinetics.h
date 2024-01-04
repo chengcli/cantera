@@ -1450,7 +1450,11 @@ public:
      * The set of products must not be changed.
      * Only the stoichiometric coefficient is changed.
      */
-    virtual void modifyProductStoichiometry(size_t i, Composition const& comp);
+    virtual void modifyProductStoichCoeff(size_t i, Composition const& comp);
+
+    virtual bool isPhotolysis(size_t i) const {
+        throw NotImplementedError("Kinetics::isPhotolysis");
+    }
 
     //! @}
 

@@ -39,6 +39,10 @@ bool BulkKinetics::addReaction(shared_ptr<Reaction> r, bool resize)
         m_irrev.push_back(nReactions()-1);
     }
 
+    if (r->photolysis) {
+      m_photo_index.push_back(nReactions()-1);
+    }
+
     shared_ptr<ReactionRate> rate = r->rate();
     string rtype = rate->subType();
     if (rtype == "") {
@@ -55,6 +59,8 @@ bool BulkKinetics::addReaction(shared_ptr<Reaction> r, bool resize)
     // Set index of rate to number of reaction within kinetics
     rate->setRateIndex(nReactions() - 1);
     rate->setContext(*r, *this);
+
+    //std::cout << "I am rate -> " << rate->data() << std::endl;
 
     // Add reaction rate to evaluator
     size_t index = m_bulk_types[rtype];
@@ -535,6 +541,18 @@ void BulkKinetics::updateROP()
         AssertFinite(m_ropr[i], "BulkKinetics::updateROP",
                      "m_ropr[{}] is not finite.", i);
     }
+
+    for (auto i : m_photo_index) {
+      m_bulk_rates[0]->peek();
+      // modify reaction if there is more than one photolysis product
+      if (m_reactions[i]->products.size() > 1) {
+        std::cout << "I'm modifying reaction = " << i << std::endl;
+        std::cout << "I'm rate = " << m_reactions[i]->rate() << std::endl;
+        std::cout << "size = " << m_reactions[i]->rate()->photoProducts().size() << std::endl;
+        modifyProductStoichCoeff(i, m_reactions[i]->rate()->photoProducts());
+      }
+    }
+
     m_ROP_ok = true;
 }
 
@@ -704,6 +722,10 @@ void __attribute__((weak)) BulkKinetics::updateActinicFlux(void *rt_solver)
     double *flux = reinterpret_cast<double*>(rt_solver);
     m_actinicFlux.assign(flux, flux + m_wavelength.size());
     m_hasNewActinicFlux = true;
+}
+
+bool BulkKinetics::isPhotolysis(size_t i) const {
+    return std::find(m_photo_index.begin(), m_photo_index.end(), i) < m_photo_index.end();
 }
 
 }

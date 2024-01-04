@@ -8,6 +8,8 @@
 #ifndef CT_MULTIRATE_H
 #define CT_MULTIRATE_H
 
+#include <iostream>
+
 #include "ReactionRate.h"
 #include "MultiRateBase.h"
 #include "cantera/base/utilities.h"
@@ -32,6 +34,12 @@ public:
                  "Cannot determine type of empty rate handler.");
         }
         return m_rxn_rates.at(0).second.type();
+    }
+
+    void peek() const override {
+      std::cout << "evaluating bulk_rate = " << std::endl;
+      std::cout << m_rxn_rates[0].first << " " << &m_rxn_rates[0].second << std::endl;
+      std::cout << "size = " << m_rxn_rates[0].second.photoProducts().size() << std::endl;
     }
 
     void add(size_t rxn_index, ReactionRate& rate) override {

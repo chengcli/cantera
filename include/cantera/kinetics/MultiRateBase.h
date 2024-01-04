@@ -32,6 +32,8 @@ public:
     //! Identifier of reaction rate type
     virtual string type() = 0;
 
+    virtual void peek() const {};
+
     //! Add reaction rate object to the evaluator
     //! @param rxn_index  index of reaction
     //! @param rate  reaction rate object

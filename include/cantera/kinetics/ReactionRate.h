@@ -216,6 +216,11 @@ public:
         m_composition_dependent_rate = comp_dep;
     }
 
+    virtual Composition const& photoProducts() const {
+        throw NotImplementedError("ReactionRate::photoProducts",
+                                  "Not implemented by '{}' object.", type());
+    }
+
 protected:
     //! Get parameters
     //! @param node  AnyMap containing rate information
