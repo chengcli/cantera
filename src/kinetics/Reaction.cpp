@@ -73,6 +73,7 @@ Reaction::Reaction(const string& equation,
 {
     setEquation(equation);
     setRate(rate_);
+
     if (m_third_body && m_third_body->name() != "M") {
         m_third_body->explicit_3rd = true;
     }
@@ -302,6 +303,8 @@ void Reaction::setRate(shared_ptr<ReactionRate> rate)
                     "contain valid pressure-dependent third body", equation());
             }
             m_third_body = make_shared<ThirdBody>("(+M)");
+        } else if (rate_type == "Photolysis") {
+          photolysis = true;
         }
     }
 }

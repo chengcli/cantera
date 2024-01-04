@@ -98,6 +98,8 @@ public:
 
     void updateActinicFlux(void *rt_solver) override;
 
+    bool isPhotolysis(size_t i) const override;
+
     //! @}
     
 protected:
@@ -193,6 +195,8 @@ protected:
     vector<double> m_sbuf0;
     vector<double> m_state;
     vector<double> m_grt; //!< Standard chemical potentials for each species
+    
+    vector<size_t> m_photo_index; //!< Indices of photolysis reactions
 };
 
 }

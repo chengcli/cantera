@@ -162,6 +162,9 @@ public:
         return bool(m_third_body);
     }
 
+    //! True if the current reaction is photolysis. False otherwise
+    bool photolysis = false;
+
 protected:
     //! Store the parameters of a Reaction needed to reconstruct an identical
     //! object using the newReaction(AnyMap&, Kinetics&) function. Does not
