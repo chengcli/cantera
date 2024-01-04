@@ -74,6 +74,7 @@ Reaction::Reaction(const string& equation,
 {
     setRate(rate_);
     setEquation(equation);
+
     if (m_third_body && m_third_body->name() != "M") {
         m_third_body->explicit_3rd = true;
     }
@@ -308,6 +309,41 @@ void Reaction::setRate(shared_ptr<ReactionRate> rate)
             "Reaction rate for reaction '{}' must not be empty.", equation());
     }
     m_rate = rate;
+
+    string rate_type = m_rate->type();
+    if (m_third_body) {
+        if (rate_type == "falloff" || rate_type == "chemically-activated") {
+            if (m_third_body->mass_action && !m_from_composition) {
+                throw InputFileError("Reaction::setRate", input,
+                    "Third-body collider does not use '(+{})' notation.",
+                    m_third_body->name());
+            }
+            m_third_body->mass_action = false;
+        } else if (rate_type == "Chebyshev") {
+            if (m_third_body->name() == "M") {
+                warn_deprecated("Chebyshev reaction equation", input, "Specifying 'M' "
+                    "in the reaction equation for Chebyshev reactions is deprecated.");
+                m_third_body.reset();
+            }
+        } else if (rate_type == "pressure-dependent-Arrhenius") {
+            if (m_third_body->name() == "M") {
+                throw InputFileError("Reaction::setRate", input,
+                    "Found superfluous '{}' in pressure-dependent-Arrhenius reaction.",
+                    m_third_body->name());
+            }
+        }
+    } else {
+        if (rate_type == "falloff" || rate_type == "chemically-activated") {
+            if (!m_from_composition) {
+                throw InputFileError("Reaction::setRate", input,
+                    "Reaction equation for falloff reaction '{}'\n does not "
+                    "contain valid pressure-dependent third body", equation());
+            }
+            m_third_body = make_shared<ThirdBody>("(+M)");
+        } else if (rate_type == "Photolysis") {
+          photolysis = true;
+        }
+    }
 }
 
 string Reaction::reactantString() const

@@ -693,7 +693,7 @@ shared_ptr<const Reaction> Kinetics::reaction(size_t i) const
     return m_reactions[i];
 }
 
-void Kinetics::modifyProductStoichiometry(size_t irxn, Composition const& comp)
+void Kinetics::modifyProductStoichCoeff(size_t irxn, Composition const& comp)
 {
     checkReactionIndex(irxn);
 

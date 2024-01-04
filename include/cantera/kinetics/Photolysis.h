@@ -124,6 +124,10 @@ class PhotolysisRate : public PhotolysisBase {
     return "Photolysis";
   }
 
+  Composition const& photoProducts() const override {
+    return m_net_products;
+  }
+
   double evalFromStruct(PhotolysisData const& data) {
     double wmin = m_temp_wave_grid[m_ntemp];
     double wmax = m_temp_wave_grid.back();
