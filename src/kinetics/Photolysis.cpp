@@ -146,9 +146,8 @@ void PhotolysisBase::setRateParameters(AnyValue const& rate,
 void PhotolysisBase::setParameters(AnyMap const& node, UnitStack const& rate_units)
 {
   map<string, int> branch_map;
+  pair<vector<double>, vector<double>> result;
   vector<double> temperature;
-  vector<double> wavelength;
-  vector<double> xsection;
 
   ReactionRate::setParameters(node, rate_units);
 
@@ -186,21 +185,24 @@ void PhotolysisBase::setParameters(AnyMap const& node, UnitStack const& rate_uni
 
       if (format == "YAML") {
         for (auto const& entry: data["data"].asVector<vector<double>>()) {
-          wavelength.push_back(entry[0]);
-          xsection.push_back(entry[1]);
+          result.first.push_back(entry[0]);
+          result.second.push_back(entry[1]);
         }
       } else if (format == "VULCAN") {
         auto files = data["filenames"].asVector<string>();
-        load_xsection_vulcan(files, m_branch, wavelength, xsection);
+        result = load_xsection_vulcan(files, m_branch);
       } else if (format == "KINETICS7") {
         auto files = data["filenames"].asVector<string>();
-        load_xsection_kinetics7(files, m_branch, wavelength, xsection);
+        result = load_xsection_kinetics7(files, m_branch);
       } else {
         throw CanteraError("PhotolysisBase::setParameters",
                            "Invalid cross-section format '{}'.", format);
       }
     }
   }
+
+  vector<double> &wavelength(result.first);
+  vector<double> &xsection(result.second);
 
   m_ntemp = temperature.size();
   m_nwave = wavelength.size();

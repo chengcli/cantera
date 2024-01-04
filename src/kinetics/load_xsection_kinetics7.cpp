@@ -1,47 +1,44 @@
 #include <cmath>
 #include <stdio.h>
 
+#include "cantera/base/stringUtils.h"
 #include "cantera/kinetics/Reaction.h"
 #include "cantera/kinetics/Photolysis.h"
 
 namespace Cantera
 {
 
-void load_xsection_kinetics7(vector<string> const& files, 
-                             vector<Composition> const& branches,
-                             vector<double>& wavelength,
-                             vector<double>& xsection)
+pair<vector<double>, vector<double>> 
+load_xsection_kinetics7(vector<string> const& files, vector<Composition> const& branches)
 {
   if (files.size() != 1) {
     throw CanteraError("load_xsection_kinetics7",
                        "Only one file can be loaded for Kinetics7 format.");
   }
 
-  auto const& file = files[0];
+  auto const& filename = files[0];
 
-  FILE* f = fopen(file.c_str(), "r");
+  FILE* file = fopen(filename.c_str(), "r");
 
-  if (!f) {
+  if (!file) {
     throw CanteraError("load_xsection_kinetics7",
-                       "Could not open file '{}'", file);
+                       "Could not open file '{}'", filename);
   }
 
-  wavelength.clear();
-  xsection.clear();
+  vector<double> wavelength;
+  vector<double> xsection;
 
   int nbranch = branches.size();
   int min_is = 9999, max_ie = 0;
 
   char *line = NULL;
-  char *dump = NULL;
   size_t len = 0;
   ssize_t read;
 
   // Read each line from the file
-  while ((read = getline(&line, &len, f)) != -1) {
+  while ((read = getline(&line, &len, file)) != -1) {
     // Skip empty lines or lines containing only whitespace
-    if (line[0] == '\n' || (line[0] && isspace((unsigned char)line[0])))
-      continue;
+    if (line[0] == '\n') continue;
 
     char equation[61];
     int is, ie, nwave;
@@ -52,12 +49,9 @@ void load_xsection_kinetics7(vector<string> const& files,
     min_is = std::min(min_is, is);
     max_ie = std::max(max_ie, ie);
 
-    // dump comment
-    getline(&dump, &len, f);
-
     if (num != 5) {
       throw CanteraError("PhotolysisBase::loadCrossSectionKinetics7",
-                         "Header format from file '{}' is wrong.", file);
+                         "Header format from file '{}' is wrong.", filename);
     }
 
     // initialize wavelength and xsection for the first time
@@ -69,29 +63,30 @@ void load_xsection_kinetics7(vector<string> const& files,
     // read content
     int ncols = 7;
     int nrows = ceil(1. * nwave / ncols);
+    
+    auto product = parseCompString(equation);
 
-    Reaction reaction;
-    parseReactionEquation(reaction, equation, {}, nullptr);
-
-    auto it = std::find(branches.begin(), branches.end(), reaction.reactants);
+    auto it = std::find(branches.begin(), branches.end(), product);
 
     if (it == branches.end()) {
       // skip this section
       for (int i = 0; i < nrows; i++)
-        getline(&dump, &len, f);
+        getline(&line, &len, file);
     } else {
       for (int i = 0; i < nrows; i++) {
-        getline(&line, &len, f);
+        getline(&line, &len, file);
 
         for (int j = 0; j < ncols; j++) {
           float wave, cross;
-          int num = sscanf(line, "%7f%10f", &wave, &cross);
+          int num = sscanf(line + 17*j, "%7f%10f", &wave, &cross);
           if (num != 2) {
             throw CanteraError("PhotolysisBase::loadCrossSectionKinetics7",
-                               "Content format from file '{}' is wrong.", file);
+                               "Cross-section format from file '{}' is wrong.", filename);
           }
           int b = it - branches.begin();
           int k = i * ncols + j;
+
+          if (k >= nwave) break;
           wavelength[k] = wave / 10.; // Angstrom to nm
           xsection[k * nbranch + b] = cross * 10.;  // cm^2 / Angstrom to cm^2 / nm
         }
@@ -106,9 +101,20 @@ void load_xsection_kinetics7(vector<string> const& files,
   xsection = vector<double>(xsection.begin() + (min_is - 1) * nbranch,
                             xsection.begin() + max_ie * nbranch);
 
-  free(dump);
+  // A -> A is the total cross section in kinetics7 format
+  // need to subtract the other branches
+
+  for (size_t i = 0; i < wavelength.size(); i++) {
+    for (int j = 1; j < nbranch; j++) {
+      xsection[i * nbranch] -= xsection[i * nbranch + j];
+    }
+    xsection[i * nbranch] = std::max(xsection[i * nbranch], 0.);
+  }
+
   free(line);
-  fclose(f);
+  fclose(file);
+
+  return {std::move(wavelength), std::move(xsection)};
 }
 
 } // namespace Cantera

@@ -125,23 +125,14 @@ class PhotolysisRate : public PhotolysisBase {
   }
 
   double evalFromStruct(PhotolysisData const& data) {
-    if (m_crossSection.empty()) {
-      return 0.;
-    }
-
     double wmin = m_temp_wave_grid[m_ntemp];
     double wmax = m_temp_wave_grid.back();
 
-    if (wmin > data.wavelength.front()) {
-      throw CanteraError("PhotolysisRate::evalFromStruct",
-                         "Wavelength out of range: {} nm < {} nm",
-                         wmin, data.wavelength.front());
-    }
-
-    if (wmax < data.wavelength.back()) {
-      throw CanteraError("PhotolysisRate::evalFromStruct",
-                         "Wavelength out of range: {} nm > {} nm",
-                         wmax, data.wavelength.back());
+    if (m_crossSection.empty() ||
+        wmin > data.wavelength.back() || 
+        wmax < data.wavelength.front()) 
+    {
+      return 0.;
     }
 
     int iwmin = locate(data.wavelength.data(), wmin, data.wavelength.size());
@@ -157,8 +148,9 @@ class PhotolysisRate : public PhotolysisBase {
         len, 2, m_branch.size());
 
     double total_rate = 0.0;
-    for (auto& [name, stoich] : m_net_products)
-      stoich = 0.0;
+    for (auto const& branch : m_branch)
+        for (auto const& [name, stoich] : branch)
+            m_net_products[name] = 0.;
 
     for (int i = iwmin; i < iwmax; i++) {
       coord[1] = data.wavelength[i+1];
@@ -168,8 +160,9 @@ class PhotolysisRate : public PhotolysisBase {
       for (size_t n = 0; n < m_branch.size(); n++) {
         double rate = 0.5 * (data.wavelength[i+1] - data.wavelength[i])
           * (cross1[n] * data.actinicFlux[i] + cross2[n] * data.actinicFlux[i+1]);
-        for (auto const& [name, stoich] : m_branch[n])
-          m_net_products[name] += rate * stoich;
+        for (auto const& [name, stoich] : m_branch[n]) {
+          m_net_products.at(name) += rate * stoich;
+        }
         total_rate += rate;
         cross1[n] = cross2[n];
       }
@@ -196,18 +189,15 @@ class PhotolysisRate : public PhotolysisBase {
  * There are two files for each photolysis reaction. The first one is for
  * cross-section data and the second one for the branch ratios.
  */
-void load_xsection_vulcan(vector<string> const& files,
-                          vector<Composition> const& branches,
-                          vector<double>& wavelength,
-                          vector<double>& xsection);
+pair<vector<double>, vector<double>> 
+load_xsection_vulcan(vector<string> const& files, vector<Composition> const& branches);
 
 /**
  * Read the cross-section data from KINETICS7 format files
  */
-void load_xsection_kinetics7(vector<string> const& files, 
-                             vector<Composition> const& branches,
-                             vector<double>& wavelength,
-                             vector<double>& xsection);
+
+pair<vector<double>, vector<double>> 
+load_xsection_kinetics7(vector<string> const& files, vector<Composition> const& branches);
 
 }
 
