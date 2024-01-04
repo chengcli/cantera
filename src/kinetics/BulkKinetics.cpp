@@ -60,8 +60,6 @@ bool BulkKinetics::addReaction(shared_ptr<Reaction> r, bool resize)
     rate->setRateIndex(nReactions() - 1);
     rate->setContext(*r, *this);
 
-    //std::cout << "I am rate -> " << rate->data() << std::endl;
-
     // Add reaction rate to evaluator
     size_t index = m_bulk_types[rtype];
     m_bulk_rates[index]->add(nReactions() - 1, *rate);
