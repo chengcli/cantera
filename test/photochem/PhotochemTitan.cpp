@@ -25,7 +25,7 @@ class PhotochemTitan: public testing::Test {
     vector<double> actinic_flux(10);
 
     for (int i = 0; i < 10; i++) {
-      wavelength[i] = 200.0 + i * 10.0;
+      wavelength[i] = 20.0 + i * 20.0;
       actinic_flux[i] = 1.0;
     }
 
@@ -51,8 +51,8 @@ TEST_F(PhotochemTitan, check_fwd_rate_constants) {
 
   kin->getFwdRateConstants(kfwd.data());
 
-  ASSERT_NEAR(kfwd[0], 0., 1.0e-8);
-  ASSERT_NEAR(kfwd[1], 0.0171, 1.0e-8);
+  ASSERT_NEAR(kfwd[0], 3.06820e-14, 1.0e-18);
+  ASSERT_NEAR(kfwd[1], 3.2e-16, 1.0e-18);
 }
 
 } // namespace Cantera
