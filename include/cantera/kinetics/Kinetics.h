@@ -1453,7 +1453,7 @@ public:
     virtual void modifyProductStoichCoeff(size_t i, Composition const& comp);
 
     virtual bool isPhotolysis(size_t i) const {
-        throw NotImplementedError("Kinetics::isPhotolysis");
+        return false;
     }
 
     //! @}

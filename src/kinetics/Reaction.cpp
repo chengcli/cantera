@@ -619,6 +619,18 @@ void Reaction::checkBalance(const Kinetics& kin) const
 {
     Composition balr, balp;
 
+    // disable balance check for photolysis reactions with more than one product
+    if (products.size() > 1 && type() == "Photolysis") {
+      for (const auto& [name, stoich] : products) {
+        if (stoich != 1.0) {
+          throw InputFileError("Reaction::checkBalance", input,
+              "Every product of a photolysis reaction '{}' must have "
+              "a unit stoichiometric coefficient", equation());
+        }
+      }
+      return;
+    }
+
     // iterate over products and reactants
     for (const auto& [name, stoich] : products) {
         const ThermoPhase& ph = kin.speciesPhase(name);
