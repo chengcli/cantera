@@ -703,7 +703,6 @@ void Kinetics::modifyProductStoichCoeff(size_t irxn, Composition const& comp)
     for (const auto& [name, stoich] : comp) {
         pk.push_back(kineticsSpeciesIndex(name));
         pstoich.push_back(stoich);
-        std::cout << name << " " << stoich << std::endl;
     }
 
     m_reactions[irxn]->products = comp;

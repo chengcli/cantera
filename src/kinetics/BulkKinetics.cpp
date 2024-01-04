@@ -541,12 +541,8 @@ void BulkKinetics::updateROP()
     }
 
     for (auto i : m_photo_index) {
-      m_bulk_rates[0]->peek();
       // modify reaction if there is more than one photolysis product
       if (m_reactions[i]->products.size() > 1) {
-        std::cout << "I'm modifying reaction = " << i << std::endl;
-        std::cout << "I'm rate = " << m_reactions[i]->rate() << std::endl;
-        std::cout << "size = " << m_reactions[i]->rate()->photoProducts().size() << std::endl;
         modifyProductStoichCoeff(i, m_reactions[i]->rate()->photoProducts());
       }
     }

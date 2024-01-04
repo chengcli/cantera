@@ -175,13 +175,6 @@ class PhotolysisRate : public PhotolysisBase {
     for (auto& [name, stoich] : m_net_products)
       stoich /= total_rate;
 
-    std::cout << "I am: " << this << std::endl;
-
-    std::cout << "net products: " << std::endl;
-    for (auto it : m_net_products) {
-      std::cout << it.first << ": " << it.second << std::endl;
-    }
-
     delete [] cross1;
     delete [] cross2;
 
