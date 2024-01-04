@@ -626,7 +626,8 @@ bool Kinetics::addReaction(shared_ptr<Reaction> r, bool resize)
 
     m_reactantStoich.add(irxn, rk, rorder, rstoich);
     // product orders = product stoichiometric coefficients
-    m_productStoich.add(irxn, pk, pstoich, pstoich);
+    bool frac = isPhotolysis(irxn) && r->products.size() > 1;
+    m_productStoich.add(irxn, pk, pstoich, pstoich, frac);
     if (r->reversible) {
         m_revProductStoich.add(irxn, pk, pstoich, pstoich);
     }

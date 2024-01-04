@@ -55,18 +55,18 @@ species:
     model: constant-cp
 
 reactions:
-- equation: CH4 => 0.2 CH4 + 0.2 CH3 + 0.2 (1)CH2 + 0.2 (3)CH2 + 0.2 CH + 0.4 H2 + 0.8 H 
+- equation: CH4 => CH4 + CH3 + (1)CH2 + (3)CH2 + CH + H2 + H
   type: photolysis
   branches:
-    - name: b1  # 0.2
+    - name: b1
       product: "CH4:1"
-    - name: b2  # 0.2
+    - name: b2
       product: "CH3:1 H:1"
-    - name: b3  # 0.2
+    - name: b3
       product: "(1)CH2:1 H2:1"
-    - name: b4  # 0.2
+    - name: b4
       product: "(3)CH2:1 H:2"
-    - name: b5  # 0.2
+    - name: b5
       product: "CH:1 H2:1 H:1"
   cross-section:
     - format: KINETICS7

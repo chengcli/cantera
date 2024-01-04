@@ -669,9 +669,10 @@ public:
      *     expression involving the species vector.
      *  @param stoich  This is used to handle fractional stoichiometric
      *     coefficients on the product side of irreversible reactions.
+     *  @param frac Specify that the reaction is a fractional reaction (photolysis).
      */
     void add(size_t rxn, const vector<size_t>& k, const vector<double>& order,
-             const vector<double>& stoich) {
+             const vector<double>& stoich, bool frac = false) {
         if (order.size() != k.size()) {
             throw CanteraError(
                 "StoichManagerN::add()", "size of order and species arrays differ");
@@ -680,7 +681,6 @@ public:
             throw CanteraError(
                 "StoichManagerN::add()", "size of stoich and species arrays differ");
         }
-        bool frac = false;
         for (size_t n = 0; n < stoich.size(); n++) {
             m_coeffList.emplace_back(
                 static_cast<int>(k[n]), static_cast<int>(rxn), stoich[n]);
