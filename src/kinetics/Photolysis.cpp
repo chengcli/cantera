@@ -2,6 +2,8 @@
 
 #include "cantera/kinetics/Kinetics.h"
 #include "cantera/kinetics/Photolysis.h"
+#include "cantera/kinetics/Reaction.h"
+#include "cantera/kinetics/ReactionRateFactory.h"
 #include "cantera/thermo/ThermoPhase.h"
 #include "cantera/base/stringUtils.h"
 
@@ -151,16 +153,26 @@ void PhotolysisBase::setParameters(AnyMap const& node, UnitStack const& rate_uni
 
   ReactionRate::setParameters(node, rate_units);
 
+  std::vector<std::string> tokens;
+  tokenizeString(node["equation"].asString(), tokens);
+  auto reactor_comp = parseCompString(tokens[0] + ":1");
+
   if (node.hasKey("branches")) {
     for (auto const& branch : node["branches"].asVector<AnyMap>()) {
-      branch_map[branch["name"].asString()] = m_branch.size();
+      std::string branch_name = branch["name"].asString();
+
+      // check duplicated branch name
+      if (branch_map.find(branch_name) != branch_map.end()) {
+        throw CanteraError("PhotolysisBase::setParameters",
+                           "Duplicated branch name '{}'.", branch_name);
+      }
+
+      branch_map[branch_name] = m_branch.size();
       m_branch.push_back(parseCompString(branch["product"].asString()));
-    } 
+    }
   } else {
-    vector<string> tokens;
-    tokenizeString(node["equation"].asString(), tokens);
     // TODO(cli): revise this for one branch
-    m_branch.push_back(parseCompString(tokens[0] + ":1"));
+    m_branch.push_back(reactor_comp);
   }
 
   if (node.hasKey("cross-section")) {
@@ -268,6 +280,18 @@ void PhotolysisBase::validate(string const& equation, Kinetics const& kin)
   if (!valid()) {
     throw InputFileError("PhotolysisBase::validate", m_input,
                        "Rate object for reaction '{}' is not configured.", equation);
+  }
+
+  std::vector<std::string> tokens;
+  tokenizeString(equation, tokens);
+  auto reactor_comp = parseCompString(tokens[0] + ":1");
+
+  for (auto const& branch : m_branch) {
+    // create a Arrhenius reaction placeholder to check balance
+    Reaction rtmp(reactor_comp, branch, newReactionRate("Arrhenius"));
+    rtmp.reversible = false;
+    rtmp.checkSpecies(kin);
+    rtmp.checkBalance(kin);
   }
 }
 

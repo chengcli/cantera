@@ -57,19 +57,12 @@ load_xsection_vulcan(vector<string> const& files, vector<Composition> const& bra
     xdiss.push_back(pdis * 1.e-4);
   }
 
-  std::cout << "Wavelength has " << wavelength.size() << " data points." << std::endl;
-  for (int i = 0; i < wavelength.size(); ++i) {
-    std::cout << wavelength[i] << " " << xsection[i] << " " << xdiss[i] << std::endl;
-  }
-
   fclose(file1);
 
   // populate photodissociation cross sections for all branches
   for (int i = 1; i < nbranch; ++i) {
     xsection.insert(xsection.end(), xdiss.begin(), xdiss.end());
   }
-
-  std::cout << "Cross section has " << xsection.size() << " data points." << std::endl;
 
   // read branch ratios
   FILE* file2 = fopen(files[1].c_str(), "r");
@@ -102,9 +95,6 @@ load_xsection_vulcan(vector<string> const& files, vector<Composition> const& bra
     }
   }
 
-  std::cout << "Branch wave has " << bwave.size() << " data points." << std::endl;
-  std::cout << "Branch ratio has " << bratio.size() << " data points." << std::endl;
-
   fclose(file2);
 
   // revise branch cross sections
@@ -117,14 +107,6 @@ load_xsection_vulcan(vector<string> const& files, vector<Composition> const& bra
     for (int j = 1; j < nbranch; ++j) {
       xsection[j * wavelength.size() + i] *= br[j - 1];
     }
-  }
-
-  for (int i = 0; i < wavelength.size(); ++i) {
-    std::cout << wavelength[i] << " ";
-    for (int j = 0; j < nbranch; ++j) {
-      std::cout << xsection[j * wavelength.size() + i] << " ";
-    }
-    std::cout << std::endl;
   }
 
   return {std::move(wavelength), std::move(xsection)};
