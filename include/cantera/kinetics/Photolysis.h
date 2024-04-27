@@ -52,7 +52,7 @@ class PhotolysisBase : public ReactionRate {
   /*!
    * @param temp Temperature grid
    * @param wavelength Wavelength grid
-   * @param branches Branch strings of the photolysis reaction
+   * @param branches Branch strings of the photolysis products
    * @param xsection Cross-section data
    */
   PhotolysisBase(vector<double> const& temp, vector<double> const& wavelength,
@@ -78,7 +78,7 @@ class PhotolysisBase : public ReactionRate {
   void validate(const string& equation, const Kinetics& kin) override;
 
  protected:
-  //! composition of branches
+  //! composition of photolysis branch products
   vector<Composition> m_branch;
 
   //! number of temperature grid points

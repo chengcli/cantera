@@ -159,6 +159,7 @@ void PhotolysisBase::setParameters(AnyMap const& node, UnitStack const& rate_uni
   } else {
     vector<string> tokens;
     tokenizeString(node["equation"].asString(), tokens);
+    // TODO(cli): revise this for one branch
     m_branch.push_back(parseCompString(tokens[0] + ":1"));
   }
 
@@ -216,12 +217,18 @@ void PhotolysisBase::setParameters(AnyMap const& node, UnitStack const& rate_uni
     m_temp_wave_grid[m_ntemp + i] = wavelength[i];
   }
 
-  // only works for one temperature range
+  // TODO(cli): only works for one temperature range
   m_crossSection = xsection;
   m_crossSection.insert(m_crossSection.end(), xsection.begin(), xsection.end());
 
   if (node.hasKey("rate-constant")) {
     setRateParameters(node["rate-constant"], branch_map);
+  }
+
+  if (m_ntemp * m_nwave * m_branch.size() != m_crossSection.size()) {
+    throw CanteraError("PhotolysisBase::PhotolysisBase",
+                       "Cross-section data size does not match the temperature, "
+                       "wavelength, and branch grid sizes.");
   }
 
   m_valid = true;

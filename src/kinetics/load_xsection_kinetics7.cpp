@@ -1,5 +1,5 @@
 #include <cmath>
-#include <stdio.h>
+#include <cstdio>
 
 #include "cantera/base/stringUtils.h"
 #include "cantera/kinetics/Reaction.h"
