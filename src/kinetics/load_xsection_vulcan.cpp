@@ -8,6 +8,7 @@
 namespace Cantera
 {
 
+//! \return a pair of vectors containing the wavelength (m) and cross section data (m^2)
 pair<vector<double>, vector<double>> 
 load_xsection_vulcan(vector<string> const& files, vector<Composition> const& branches)
 {
@@ -47,10 +48,13 @@ load_xsection_vulcan(vector<string> const& files, vector<Composition> const& bra
                          "Could not read line: " + string(line));
     }
 
-    wavelength.push_back(wave);
+    // nm -> m
+    wavelength.push_back(wave * 1.e-9);
+
     // TODO(AB): check this and we ignore pion
-    xsection.push_back(pabs - pdis);
-    xdiss.push_back(pdis);
+    // cm^2 -> m^2
+    xsection.push_back(std::max(pabs - pdis, 0.) * 1.e-4);
+    xdiss.push_back(pdis * 1.e-4);
   }
 
   std::cout << "Wavelength has " << wavelength.size() << " data points." << std::endl;
@@ -85,7 +89,8 @@ load_xsection_vulcan(vector<string> const& files, vector<Composition> const& bra
   // read content
   while ((read = getline(&line, &len, file1)) != -1) {
     char *token = strtok(line, ",");
-    bwave.push_back(atof(token));
+    // nm -> m
+    bwave.push_back(atof(token) * 1.e-9);
 
     for (int i = 1; i < nbranch; ++i) {
       token = strtok(NULL, ",");
