@@ -96,7 +96,7 @@ class PhotolysisBase : public ReactionRate {
   //! The first dimension is the number of temperature grid points, the second dimension
   //! is the number of wavelength grid points, and the third dimension is the number of
   //! branches of the photolysis reaction.
-  //! Default units are nanometers, cm^2, cm^2, and cm^2, respectively.
+  //! Default units are SI units such as m, m^2, and m^2/m.
   vector<double> m_crossSection;
 };
 

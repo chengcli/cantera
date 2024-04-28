@@ -88,8 +88,10 @@ load_xsection_kinetics7(vector<string> const& files, vector<Composition> const& 
           int k = i * ncols + j;
 
           if (k >= nwave) break;
-          wavelength[k] = wave / 10.; // Angstrom to nm
-          xsection[k * nbranch + b] = cross * 10.;  // cm^2 / Angstrom to cm^2 / nm
+          // Angstrom -> m
+          wavelength[k] = wave * 1.e-10;
+          // cm^2 / Angstrom -> m^2 / m
+          xsection[k * nbranch + b] = cross * 1.e6;
         }
       }
     }
