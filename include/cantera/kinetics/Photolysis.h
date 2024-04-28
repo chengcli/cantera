@@ -128,58 +128,7 @@ class PhotolysisRate : public PhotolysisBase {
     return m_net_products;
   }
 
-  double evalFromStruct(PhotolysisData const& data) {
-    double wmin = m_temp_wave_grid[m_ntemp];
-    double wmax = m_temp_wave_grid.back();
-
-    if (m_crossSection.empty() ||
-        wmin > data.wavelength.back() || 
-        wmax < data.wavelength.front()) 
-    {
-      return 0.;
-    }
-
-    int iwmin = locate(data.wavelength.data(), wmin, data.wavelength.size());
-    int iwmax = locate(data.wavelength.data(), wmax, data.wavelength.size());
-
-    double* cross1 = new double [m_branch.size()];
-    double* cross2 = new double [m_branch.size()];
-
-    double coord[2] = {data.temperature, data.wavelength[iwmin]};
-    size_t len[2] = {m_ntemp, m_nwave};
-
-    interpn(cross1, coord, m_crossSection.data(), m_temp_wave_grid.data(),
-        len, 2, m_branch.size());
-
-    double total_rate = 0.0;
-    for (auto const& branch : m_branch)
-        for (auto const& [name, stoich] : branch)
-            m_net_products[name] = 0.;
-
-    for (int i = iwmin; i < iwmax; i++) {
-      coord[1] = data.wavelength[i+1];
-      interpn(cross2, coord, m_crossSection.data(), m_temp_wave_grid.data(),
-          len, 2, m_branch.size());
-
-      for (size_t n = 0; n < m_branch.size(); n++) {
-        double rate = 0.5 * (data.wavelength[i+1] - data.wavelength[i])
-          * (cross1[n] * data.actinicFlux[i] + cross2[n] * data.actinicFlux[i+1]);
-        for (auto const& [name, stoich] : m_branch[n]) {
-          m_net_products.at(name) += rate * stoich;
-        }
-        total_rate += rate;
-        cross1[n] = cross2[n];
-      }
-    }
-
-    for (auto& [name, stoich] : m_net_products)
-      stoich /= total_rate;
-
-    delete [] cross1;
-    delete [] cross2;
-
-    return total_rate;
-  }
+  double evalFromStruct(PhotolysisData const& data);
 
  protected:
   //! net stoichiometric coefficients of products
@@ -187,11 +136,17 @@ class PhotolysisRate : public PhotolysisBase {
 };
 
 /**
- * Read the cross-section data from VULCAN format files
+ * @breif Read the cross-section data from VULCAN format files
+ *
+ * @param branches Composition of the photodissociation products (no
+ * photoabsorption branch). 
  *
  * @param files Vector of filenames.
  * There are two files for each photolysis reaction. The first one is for
  * cross-section data and the second one for the branch ratios.
+ *
+ * @return a pair of vectors containing the wavelength (m) and 
+ * cross section data (m^2 / m)
  */
 pair<vector<double>, vector<double>> 
 load_xsection_vulcan(vector<string> const& files, vector<Composition> const& branches);

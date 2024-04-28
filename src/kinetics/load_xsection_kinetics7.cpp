@@ -28,6 +28,7 @@ load_xsection_kinetics7(vector<string> const& files, vector<Composition> const& 
   vector<double> wavelength;
   vector<double> xsection;
 
+  // first cross section data is always the photoabsorption cross section (no dissociation)
   int nbranch = branches.size();
   int min_is = 9999, max_ie = 0;
 

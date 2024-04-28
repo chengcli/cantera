@@ -153,9 +153,18 @@ void PhotolysisBase::setParameters(AnyMap const& node, UnitStack const& rate_uni
 
   ReactionRate::setParameters(node, rate_units);
 
-  std::vector<std::string> tokens;
-  tokenizeString(node["equation"].asString(), tokens);
-  auto reactor_comp = parseCompString(tokens[0] + ":1");
+  // set up a dummy reaction to parse the reaction equation
+  Reaction rtmp;
+  parseReactionEquation(rtmp, node["equation"].asString(), node, nullptr);
+
+  if (rtmp.reactants.size() != 1 || rtmp.reactants.begin()->second != 1) {
+    throw CanteraError("PhotolysisBase::setParameters",
+                       "Photolysis reaction must have one reactant with stoichiometry 1.");
+  }
+
+  // b0 is reserved for the photoabsorption cross section
+  branch_map["b0"] = 0;
+  m_branch.push_back(rtmp.reactants);
 
   if (node.hasKey("branches")) {
     for (auto const& branch : node["branches"].asVector<AnyMap>()) {
@@ -170,9 +179,8 @@ void PhotolysisBase::setParameters(AnyMap const& node, UnitStack const& rate_uni
       branch_map[branch_name] = m_branch.size();
       m_branch.push_back(parseCompString(branch["product"].asString()));
     }
-  } else {
-    // TODO(cli): revise this for one branch
-    m_branch.push_back(reactor_comp);
+  } else if (rtmp.products != rtmp.reactants) { // this is not photoabsorption
+    m_branch.push_back(rtmp.products);
   }
 
   if (node.hasKey("cross-section")) {
@@ -237,6 +245,19 @@ void PhotolysisBase::setParameters(AnyMap const& node, UnitStack const& rate_uni
     setRateParameters(node["rate-constant"], branch_map);
   }
 
+  /* debug
+  std::cout << "number of temperature: " << m_ntemp << std::endl;
+  std::cout << "number of wavelength: " << m_nwave << std::endl;
+  std::cout << "number of branches: " << m_branch.size() << std::endl;
+  for (auto const& branch : branch_map) {
+    std::cout << "branch: " << branch.first << std::endl;
+    for (auto const& [name, stoich] : m_branch[branch.second]) {
+      std::cout << name << " " << stoich << std::endl;
+    }
+  }
+  std::cout << "number of cross-section: " << m_crossSection.size() << std::endl;
+  */
+
   if (m_ntemp * m_nwave * m_branch.size() != m_crossSection.size()) {
     throw CanteraError("PhotolysisBase::PhotolysisBase",
                        "Cross-section data size does not match the temperature, "
@@ -286,13 +307,87 @@ void PhotolysisBase::validate(string const& equation, Kinetics const& kin)
   tokenizeString(equation, tokens);
   auto reactor_comp = parseCompString(tokens[0] + ":1");
 
+  // set up a dummy reaction to parse the reaction equation
+  Reaction rtmp;
+  parseReactionEquation(rtmp, equation, m_input, nullptr);
+
+  std::set<std::string> species_from_equation, species_from_branches;
+
+  species_from_equation.insert(rtmp.reactants.begin()->first);
+  for (auto const& [name, stoich] : rtmp.products) {
+    species_from_equation.insert(name);
+  }
+
+  species_from_branches.insert(rtmp.reactants.begin()->first);
   for (auto const& branch : m_branch) {
     // create a Arrhenius reaction placeholder to check balance
     Reaction rtmp(reactor_comp, branch, newReactionRate("Arrhenius"));
     rtmp.reversible = false;
     rtmp.checkSpecies(kin);
     rtmp.checkBalance(kin);
+    for (auto const& [name, stoich] : branch) {
+      species_from_branches.insert(name);
+    }
   }
+
+  if (species_from_equation != species_from_branches) {
+    throw InputFileError("PhotolysisBase::validate", m_input,
+                       "Reaction '{}' has different products than the photolysis branches.", equation);
+  }
+}
+
+double PhotolysisRate::evalFromStruct(PhotolysisData const& data) {
+    double wmin = m_temp_wave_grid[m_ntemp];
+    double wmax = m_temp_wave_grid.back();
+
+    if (m_crossSection.empty() ||
+        wmin > data.wavelength.back() || 
+        wmax < data.wavelength.front()) 
+    {
+      return 0.;
+    }
+
+    int iwmin = locate(data.wavelength.data(), wmin, data.wavelength.size());
+    int iwmax = locate(data.wavelength.data(), wmax, data.wavelength.size());
+
+    double* cross1 = new double [m_branch.size()];
+    double* cross2 = new double [m_branch.size()];
+
+    double coord[2] = {data.temperature, data.wavelength[iwmin]};
+    size_t len[2] = {m_ntemp, m_nwave};
+
+    interpn(cross1, coord, m_crossSection.data(), m_temp_wave_grid.data(),
+        len, 2, m_branch.size());
+
+    double total_rate = 0.0;
+    for (auto const& branch : m_branch) {
+        for (auto const& [name, stoich] : branch)
+            m_net_products[name] = 0.;
+    }
+
+    for (int i = iwmin; i < iwmax; i++) {
+      coord[1] = data.wavelength[i+1];
+      interpn(cross2, coord, m_crossSection.data(), m_temp_wave_grid.data(),
+          len, 2, m_branch.size());
+
+      for (size_t n = 0; n < m_branch.size(); n++) {
+        double rate = 0.5 * (data.wavelength[i+1] - data.wavelength[i])
+          * (cross1[n] * data.actinicFlux[i] + cross2[n] * data.actinicFlux[i+1]);
+        for (auto const& [name, stoich] : m_branch[n]) {
+          m_net_products.at(name) += rate * stoich;
+        }
+        total_rate += rate;
+        cross1[n] = cross2[n];
+      }
+    }
+
+    for (auto& [name, stoich] : m_net_products)
+      stoich /= total_rate;
+
+    delete [] cross1;
+    delete [] cross2;
+
+    return total_rate;
 }
 
 }
