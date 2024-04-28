@@ -64,6 +64,7 @@ load_xsection_kinetics7(vector<string> const& files, vector<Composition> const& 
     int ncols = 7;
     int nrows = ceil(1. * nwave / ncols);
     
+    equation[60] = '\0';
     auto product = parseCompString(equation);
 
     auto it = std::find(branches.begin(), branches.end(), product);
