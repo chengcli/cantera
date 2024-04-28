@@ -1,5 +1,5 @@
 #include <cmath>
-#include <stdio.h>
+#include <cstdio>
 
 #include "cantera/base/stringUtils.h"
 #include "cantera/kinetics/Reaction.h"
@@ -28,6 +28,7 @@ load_xsection_kinetics7(vector<string> const& files, vector<Composition> const& 
   vector<double> wavelength;
   vector<double> xsection;
 
+  // first cross section data is always the photoabsorption cross section (no dissociation)
   int nbranch = branches.size();
   int min_is = 9999, max_ie = 0;
 
@@ -64,6 +65,7 @@ load_xsection_kinetics7(vector<string> const& files, vector<Composition> const& 
     int ncols = 7;
     int nrows = ceil(1. * nwave / ncols);
     
+    equation[60] = '\0';
     auto product = parseCompString(equation);
 
     auto it = std::find(branches.begin(), branches.end(), product);
@@ -87,8 +89,10 @@ load_xsection_kinetics7(vector<string> const& files, vector<Composition> const& 
           int k = i * ncols + j;
 
           if (k >= nwave) break;
-          wavelength[k] = wave / 10.; // Angstrom to nm
-          xsection[k * nbranch + b] = cross * 10.;  // cm^2 / Angstrom to cm^2 / nm
+          // Angstrom -> m
+          wavelength[k] = wave * 1.e-10;
+          // cm^2 -> m^2
+          xsection[k * nbranch + b] = cross * 1.e-4;
         }
       }
     }
@@ -113,6 +117,15 @@ load_xsection_kinetics7(vector<string> const& files, vector<Composition> const& 
 
   free(line);
   fclose(file);
+
+  /* debug
+  for (size_t i = 0; i < wavelength.size(); i++) {
+    printf("%g ", wavelength[i]);
+    for (int j = 0; j < nbranch; j++) {
+      printf("%g ",xsection[i * nbranch + j]);
+    }
+    printf("\n");
+  }*/
 
   return {std::move(wavelength), std::move(xsection)};
 }
