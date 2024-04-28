@@ -53,9 +53,9 @@ load_xsection_vulcan(vector<string> const& files, vector<Composition> const& bra
     wavelength.push_back(wave * 1.e-9);
 
     // TODO(AB): check this and we ignore pion
-    // cm^2 / nm -> m^2 / m
+    // cm^2 -> m^2
     xsection.push_back(std::max(pabs - pdis, 0.) * 1.e-4);
-    xdiss.push_back(pdis * 1.e5);
+    xdiss.push_back(pdis * 1.e-4);
   }
 
   fclose(file1);

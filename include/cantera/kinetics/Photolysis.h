@@ -133,6 +133,9 @@ class PhotolysisRate : public PhotolysisBase {
  protected:
   //! net stoichiometric coefficients of products
   Composition m_net_products;
+
+  //! photoabsorption rate coefficient
+  double m_photoabsorption_rate;
 };
 
 /**
@@ -145,8 +148,7 @@ class PhotolysisRate : public PhotolysisBase {
  * There are two files for each photolysis reaction. The first one is for
  * cross-section data and the second one for the branch ratios.
  *
- * @return a pair of vectors containing the wavelength (m) and 
- * cross section data (m^2 / m)
+ * @return a pair of vectors containing the wavelength (m) and cross section data (m^2)
  */
 pair<vector<double>, vector<double>> 
 load_xsection_vulcan(vector<string> const& files, vector<Composition> const& branches);

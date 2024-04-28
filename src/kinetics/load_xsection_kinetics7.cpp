@@ -91,8 +91,8 @@ load_xsection_kinetics7(vector<string> const& files, vector<Composition> const& 
           if (k >= nwave) break;
           // Angstrom -> m
           wavelength[k] = wave * 1.e-10;
-          // cm^2 / Angstrom -> m^2 / m
-          xsection[k * nbranch + b] = cross * 1.e6;
+          // cm^2 -> m^2
+          xsection[k * nbranch + b] = cross * 1.e-4;
         }
       }
     }
@@ -117,6 +117,15 @@ load_xsection_kinetics7(vector<string> const& files, vector<Composition> const& 
 
   free(line);
   fclose(file);
+
+  /* debug
+  for (size_t i = 0; i < wavelength.size(); i++) {
+    printf("%g ", wavelength[i]);
+    for (int j = 0; j < nbranch; j++) {
+      printf("%g ",xsection[i * nbranch + j]);
+    }
+    printf("\n");
+  }*/
 
   return {std::move(wavelength), std::move(xsection)};
 }

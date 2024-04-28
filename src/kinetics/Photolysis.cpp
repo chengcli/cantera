@@ -344,28 +344,42 @@ double PhotolysisRate::evalFromStruct(PhotolysisData const& data) {
         wmin > data.wavelength.back() || 
         wmax < data.wavelength.front()) 
     {
+      m_photoabsorption_rate = 0.;
       return 0.;
     }
 
-    int iwmin = locate(data.wavelength.data(), wmin, data.wavelength.size());
-    int iwmax = locate(data.wavelength.data(), wmax, data.wavelength.size());
+    /* debug
+    std::cout << "wavelength data range: " << wmin << " " << wmax << std::endl;
+    std::cout << "temperature = " << data.temperature << std::endl;
+    std::cout << "wavelength = " << std::endl;
+    for (auto w : data.wavelength) {
+      std::cout << w << std::endl;
+    }*/
 
     double* cross1 = new double [m_branch.size()];
     double* cross2 = new double [m_branch.size()];
 
-    double coord[2] = {data.temperature, data.wavelength[iwmin]};
+    double coord[2] = {data.temperature, data.wavelength[0]};
     size_t len[2] = {m_ntemp, m_nwave};
 
     interpn(cross1, coord, m_crossSection.data(), m_temp_wave_grid.data(),
         len, 2, m_branch.size());
 
     double total_rate = 0.0;
-    for (auto const& branch : m_branch) {
-        for (auto const& [name, stoich] : branch)
-            m_net_products[name] = 0.;
+    // prevent division by zero
+    double eps = 1.e-30;
+    double total_rate_eps = 0.;
+
+    // first branch is photoabsorption
+    m_photoabsorption_rate = 0.;
+    for (size_t n = 1; n < m_branch.size(); n++) {
+      for (auto const& [name, stoich] : m_branch[n])
+        m_net_products[name] = 0.;
     }
 
-    for (int i = iwmin; i < iwmax; i++) {
+    for (size_t i = 0; i < data.wavelength.size() - 1; ++i) {
+      // debug
+      //std::cout << "wavelength = " << data.wavelength[i] << " " << data.wavelength[i+1] << std::endl;
       coord[1] = data.wavelength[i+1];
       interpn(cross2, coord, m_crossSection.data(), m_temp_wave_grid.data(),
           len, 2, m_branch.size());
@@ -373,16 +387,33 @@ double PhotolysisRate::evalFromStruct(PhotolysisData const& data) {
       for (size_t n = 0; n < m_branch.size(); n++) {
         double rate = 0.5 * (data.wavelength[i+1] - data.wavelength[i])
           * (cross1[n] * data.actinicFlux[i] + cross2[n] * data.actinicFlux[i+1]);
-        for (auto const& [name, stoich] : m_branch[n]) {
-          m_net_products.at(name) += rate * stoich;
+
+        // debug
+        //std::cout << "cross section [ " << n << "] = " << cross1[n] << " " << cross2[n] << std::endl;
+        
+        if (n == 0) { // photoabsorption
+          m_photoabsorption_rate += rate;
+        } else {  // photodissociation
+          for (auto const& [name, stoich] : m_branch[n]) {
+            m_net_products.at(name) += (rate + eps) * stoich;
+          }
+          total_rate += rate;
+          total_rate_eps += rate + eps;
         }
-        total_rate += rate;
+
         cross1[n] = cross2[n];
       }
     }
 
     for (auto& [name, stoich] : m_net_products)
-      stoich /= total_rate;
+      stoich /= total_rate_eps;
+
+    /* debug
+    for (auto const& [name, stoich] : m_net_products)
+      std::cout << name << " " << stoich << std::endl;
+    std::cout << "photodissociation rate: " << total_rate << std::endl;
+    std::cout << "photoabsorption rate: " << m_photoabsorption_rate << std::endl;
+    */
 
     delete [] cross1;
     delete [] cross2;
