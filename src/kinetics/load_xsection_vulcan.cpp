@@ -8,8 +8,6 @@
 namespace Cantera
 {
 
-//! \return a pair of vectors containing the wavelength (m) 
-//! and cross section data (m^2 / m)
 pair<vector<double>, vector<double>> 
 load_xsection_vulcan(vector<string> const& files, vector<Composition> const& branches)
 {

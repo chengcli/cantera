@@ -139,7 +139,7 @@ class PhotolysisRate : public PhotolysisBase {
 };
 
 /**
- * @breif Read the cross-section data from VULCAN format files
+ * @brief Read the cross-section data from VULCAN format files
  *
  * @param branches Composition of the photodissociation products (no
  * photoabsorption branch). 
