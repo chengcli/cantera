@@ -21,7 +21,7 @@ OneDim::OneDim()
     m_newt = make_unique<MultiNewton>(1);
 }
 
-OneDim::OneDim(vector<shared_ptr<Domain1D>>& domains)
+OneDim::OneDim(vector<shared_ptr<Domain1D>> domains)
 {
     // create a Newton iterator, and add each domain.
     m_newt = make_unique<MultiNewton>(1);
