@@ -29,7 +29,7 @@ public:
     OneDim();
 
     //! Construct a OneDim container for the domains in the list *domains*.
-    OneDim(vector<shared_ptr<Domain1D>> domains);
+    OneDim(vector<shared_ptr<Domain1D>>& domains);
 
     virtual ~OneDim();
     OneDim(const OneDim&) = delete;
