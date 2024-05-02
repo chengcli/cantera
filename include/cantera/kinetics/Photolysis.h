@@ -1,4 +1,6 @@
-//! @file Photolysis.h
+/** @file Photolysis.h
+ * Header for reaction rates that involve Photochemical reactions
+ */
 
 #ifndef CT_PHOTOLYSIS_H
 #define CT_PHOTOLYSIS_H
@@ -69,12 +71,16 @@ class PhotolysisBase : public ReactionRate {
   //! @param branch_map Map of branch names to branch indices
   void setRateParameters(const AnyValue& rate, map<string, int> const& branch_map);
 
+  //! Get the parameters corresponding to node rate-constant
   void getParameters(AnyMap& node) const override;
 
+  //! Get the parameters for a given node with flow style output
   void getRateParameters(AnyMap& node) const;
 
+  //! Checks for temperature range, and wavelength data
   void check(string const& equation) override;
 
+  //! Checks for valid species, stoichiometric balance, and consistency with photolysis branches
   void validate(const string& equation, const Kinetics& kin) override;
 
  protected:
@@ -120,21 +126,28 @@ class PhotolysisRate : public PhotolysisBase {
     return make_unique<MultiRate<PhotolysisRate, PhotolysisData>>();
   }
 
+  //! reaction string type for photolysis reactions
   const string type() const override {
     return "Photolysis";
   }
-
+  
+  //! net stoichiometric coefficients of photolysis products
   Composition const& photoProducts() const override {
     return m_net_products;
   }
 
+/**
+ * @brief Calculates the photolysis reaction rate and updates stoichiometric concentration of products
+ * 
+ * @return total photolysis rate from all the branches
+ */
   double evalFromStruct(PhotolysisData const& data);
 
  protected:
   //! net stoichiometric coefficients of products
   Composition m_net_products;
 
-  //! photoabsorption rate coefficient
+  //! net photoabsorption rate
   double m_photoabsorption_rate;
 };
 
