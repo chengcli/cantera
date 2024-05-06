@@ -53,15 +53,13 @@ load_xsection_vulcan(vector<string> const& files, vector<Composition> const& bra
     // TODO(AB): check this and we ignore pion
     // cm^2 -> m^2
     xsection.push_back(std::max(pabs - pdis, 0.) * 1.e-4);
-    xdiss.push_back(pdis * 1.e-4);
+    // populate photodissociation cross sections for all branches
+    for (int i = 1; i < nbranch; ++i) {
+      xsection.push_back(pdis * 1.e-4);
+    }
   }
 
   fclose(file1);
-
-  // populate photodissociation cross sections for all branches
-  for (int i = 1; i < nbranch; ++i) {
-    xsection.insert(xsection.end(), xdiss.begin(), xdiss.end());
-  }
 
   // read branch ratios
   FILE* file2 = fopen(files[1].c_str(), "r");
@@ -104,7 +102,7 @@ load_xsection_vulcan(vector<string> const& files, vector<Composition> const& bra
     interpn(br.data(), &wavelength[i], bratio.data(), bwave.data(), &len, 1, nbranch - 1);
 
     for (int j = 1; j < nbranch; ++j) {
-      xsection[j * wavelength.size() + i] *= br[j - 1];
+      xsection[i * nbranch + j] *= br[j - 1];
     }
   }
 
