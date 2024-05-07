@@ -1402,30 +1402,41 @@ public:
     //! @{
    
     size_t nWavelengths() const {
-        return m_wavelength.size();
+        auto tmp = m_wavelength.lock();
+        return tmp ? tmp->size() : 0;
     }
 
     /**
      * Set the wavelengths at which the actinic flux is calculated.
      */
-    void setWavelength(double const* wavelength, size_t n) {
-        m_wavelength.assign(wavelength, wavelength + n);
-        m_actinicFlux.resize(n);
-        std::fill(m_actinicFlux.begin(), m_actinicFlux.end(), 0.0);
+    void setWavelength(std::shared_ptr<vector<double>> wavelength) {
+        m_wavelength = wavelength;
     }
 
     /**
      * Get the wavelengths at which the actinic flux is calculated.
      */
     void getWavelength(double* wavelength) const {
-        std::copy(m_wavelength.begin(), m_wavelength.end(), wavelength);
+        auto tmp = m_wavelength.lock();
+        if (!tmp) return;
+        std::copy(tmp->begin(), tmp->end(), wavelength);
     }
 
     /**
-     * Update the actinic flux for each wavelength.
+     * set the actinic flux for each wavelength.
      */
-    virtual void updateActinicFlux(void *rt_solver) {
-        throw NotImplementedError("Kinetics::updateActinicFlux");
+    void setActinicFlux(std::shared_ptr<vector<double>> actinic_flux) {
+        m_actinicFlux = actinic_flux;
+        m_hasNewActinicFlux = true;
+    }
+
+    void setActinicFluxStart(size_t il) {
+        if (il  + nWavelengths() > m_actinicFlux.lock()->size()) {
+            throw CanteraError("Kinetics::setActinicFluxStart",
+                               "Requested start index {} is out of bounds for actinic flux vector of length {}",
+                               il, nWavelengths());
+        }
+        m_actinicFluxStart = il;
     }
 
     /**
@@ -1442,7 +1453,10 @@ public:
      * calculate the photolysis rates of reactions.
      */
     void getActinicFlux(double *actinic_flux) const {
-        std::copy(m_actinicFlux.begin(), m_actinicFlux.end(), actinic_flux);
+        auto tmp = m_actinicFlux.lock();
+        if (!tmp) return;
+        auto il = m_actinicFluxStart;
+        std::copy(tmp->begin() + il, tmp->begin() + il + nWavelengths(), actinic_flux);
     }
 
     /**
@@ -1451,10 +1465,6 @@ public:
      * Only the stoichiometric coefficient is changed.
      */
     virtual void modifyProductStoichCoeff(size_t i, Composition const& comp);
-
-    virtual bool isPhotolysis(size_t i) const {
-        return false;
-    }
 
     //! @}
 
@@ -1579,11 +1589,14 @@ protected:
     //! reference to Solution
     std::weak_ptr<Solution> m_root;
 
-    //! Photon wavelengths
-    vector<double> m_wavelength;
+    //! reference to Photon wavelengths
+    std::weak_ptr<vector<double>> m_wavelength;
 
-    //! Photon actinic fluxes
-    vector<double> m_actinicFlux;
+    //! reference Photon actinic fluxes
+    std::weak_ptr<vector<double>> m_actinicFlux;
+
+    //! Start index of actinic fluxes to use
+    size_t m_actinicFluxStart = 0;
 
     //! Flag indicating whether the actinic fluxes have been updated
     bool m_hasNewActinicFlux = false;

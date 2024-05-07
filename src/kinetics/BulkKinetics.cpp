@@ -712,15 +712,4 @@ void BulkKinetics::assertDerivativesValid(const string& name)
     }
 }
 
-void __attribute__((weak)) BulkKinetics::updateActinicFlux(void *rt_solver)
-{
-    double *flux = reinterpret_cast<double*>(rt_solver);
-    m_actinicFlux.assign(flux, flux + m_wavelength.size());
-    m_hasNewActinicFlux = true;
-}
-
-bool BulkKinetics::isPhotolysis(size_t i) const {
-    return std::find(m_photo_index.begin(), m_photo_index.end(), i) < m_photo_index.end();
-}
-
 }

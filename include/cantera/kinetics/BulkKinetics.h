@@ -93,15 +93,6 @@ public:
 
     //! @}
     
-    //! @name Photolysis methods
-    //! @{
-
-    void updateActinicFlux(void *rt_solver) override;
-
-    bool isPhotolysis(size_t i) const override;
-
-    //! @}
-    
 protected:
     //! @name Internal service methods
     //!
