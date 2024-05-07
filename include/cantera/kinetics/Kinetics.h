@@ -14,6 +14,8 @@
 #include "StoichManager.h"
 #include "cantera/base/ValueCache.h"
 
+class ActinicFlux;
+
 namespace Cantera
 {
 
@@ -1400,6 +1402,11 @@ public:
 
     //! @name Photolysis calculation methods
     //! @{
+    
+    /**
+     * Set the reference to the actinic flux handler
+     */
+    void handleActinicFlux(std::shared_ptr<ActinicFlux> actinic_flux);
    
     size_t nWavelengths() const {
         auto tmp = m_wavelength.lock();
@@ -1407,36 +1414,31 @@ public:
     }
 
     /**
-     * Set the wavelengths at which the actinic flux is calculated.
-     */
-    void setWavelength(std::shared_ptr<vector<double>> wavelength) {
-        m_wavelength = wavelength;
-    }
-
-    /**
      * Get the wavelengths at which the actinic flux is calculated.
      */
     void getWavelength(double* wavelength) const {
         auto tmp = m_wavelength.lock();
-        if (!tmp) return;
-        std::copy(tmp->begin(), tmp->end(), wavelength);
+        if (tmp) {
+          std::copy(tmp->begin(), tmp->end(), wavelength);
+        }
     }
 
-    /**
-     * set the actinic flux for each wavelength.
-     */
-    void setActinicFlux(std::shared_ptr<vector<double>> actinic_flux) {
-        m_actinicFlux = actinic_flux;
-        m_hasNewActinicFlux = true;
-    }
+    void setActinicFluxLevel(size_t il) {
+        if (!m_actinicFlux.lock()) {
+            throw CanteraError("Kinetics::setActinicFluxLevel",
+                               "Actinic flux vector has not been set");
+        }
 
-    void setActinicFluxStart(size_t il) {
-        if (il  + nWavelengths() > m_actinicFlux.lock()->size()) {
-            throw CanteraError("Kinetics::setActinicFluxStart",
+        if ((il  + 1) * nWavelengths() > m_actinicFlux.lock()->size()) {
+            throw CanteraError("Kinetics::setActinicFluxLevel",
                                "Requested start index {} is out of bounds for actinic flux vector of length {}",
                                il, nWavelengths());
         }
-        m_actinicFluxStart = il;
+
+        if (il != m_actinicFluxLevel) {
+            m_actinicFluxLevel = il;
+            m_hasNewActinicFlux = true;
+        }
     }
 
     /**
@@ -1453,10 +1455,12 @@ public:
      * calculate the photolysis rates of reactions.
      */
     void getActinicFlux(double *actinic_flux) const {
+        auto nwave = nWavelengths();
         auto tmp = m_actinicFlux.lock();
-        if (!tmp) return;
-        auto il = m_actinicFluxStart;
-        std::copy(tmp->begin() + il, tmp->begin() + il + nWavelengths(), actinic_flux);
+        if (tmp) {
+          auto il = m_actinicFluxLevel * nwave;
+          std::copy(tmp->begin() + il, tmp->begin() + il + nwave, actinic_flux);
+        }
     }
 
     /**
@@ -1590,13 +1594,13 @@ protected:
     std::weak_ptr<Solution> m_root;
 
     //! reference to Photon wavelengths
-    std::weak_ptr<vector<double>> m_wavelength;
+    std::weak_ptr<vector<double> const> m_wavelength;
 
     //! reference Photon actinic fluxes
-    std::weak_ptr<vector<double>> m_actinicFlux;
+    std::weak_ptr<vector<double> const> m_actinicFlux;
 
     //! Start index of actinic fluxes to use
-    size_t m_actinicFluxStart = 0;
+    size_t m_actinicFluxLevel = 0;
 
     //! Flag indicating whether the actinic fluxes have been updated
     bool m_hasNewActinicFlux = false;

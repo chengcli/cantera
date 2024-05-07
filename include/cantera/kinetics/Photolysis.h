@@ -77,6 +77,8 @@ class PhotolysisBase : public ReactionRate {
 
   void validate(const string& equation, const Kinetics& kin) override;
 
+  vector<double> getCrossSection(double temp, double wavelength) const;
+
  protected:
   //! composition of photolysis branch products
   vector<Composition> m_branch;
@@ -133,9 +135,6 @@ class PhotolysisRate : public PhotolysisBase {
  protected:
   //! net stoichiometric coefficients of products
   Composition m_net_products;
-
-  //! photoabsorption rate coefficient
-  double m_photoabsorption_rate;
 };
 
 /**
