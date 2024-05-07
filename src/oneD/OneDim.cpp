@@ -368,7 +368,7 @@ double OneDim::timeStep(int nsteps, double dt, double* x, double* r, int logleve
                 dt *= 1.5;
             }
             if (m_time_step_callback) {
-                m_time_step_callback->eval(dt);
+                m_time_step_callback->eval(dt, r);
             }
             dt = std::min(dt, m_tmax);
             if (m_nsteps >= m_nsteps_max) {
