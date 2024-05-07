@@ -374,7 +374,8 @@ double PhotolysisRate::evalFromStruct(PhotolysisData const& data) {
     std::cout << "wavelength = " << std::endl;
     for (auto w : data.wavelength) {
       std::cout << w << std::endl;
-    }*/
+    }
+    std::cout << "nbranch = " << m_branch.size() << std::endl;*/
 
     double* cross1 = new double [m_branch.size()];
     double* cross2 = new double [m_branch.size()];
@@ -403,7 +404,7 @@ double PhotolysisRate::evalFromStruct(PhotolysisData const& data) {
     std::cout << m_crossSection[1] << std::endl;
     std::cout << m_crossSection[2] << std::endl;
     std::cout << "grid = " << std::endl;
-    for (int n = 0; n < m_temp_wave_grid.size(); n++) {
+    for (size_t n = 0; n < m_temp_wave_grid.size(); n++) {
       std::cout << m_temp_wave_grid[n] << std::endl;
     }*/
 
@@ -420,6 +421,7 @@ double PhotolysisRate::evalFromStruct(PhotolysisData const& data) {
           * (cross1[n] * data.actinicFlux[i] + cross2[n] * data.actinicFlux[i+1]);
 
         // debug
+        //std::cout << "actinic flux [ " << i << "] = " << data.actinicFlux[i] << " " << data.actinicFlux[i+1] << std::endl;
         //std::cout << "cross section [ " << n << "] = " << cross1[n] << " " << cross2[n] << std::endl;
         
         for (auto const& [name, stoich] : m_branch[n]) {
@@ -438,9 +440,7 @@ double PhotolysisRate::evalFromStruct(PhotolysisData const& data) {
     /* debug
     for (auto const& [name, stoich] : m_net_products)
       std::cout << name << " " << stoich << std::endl;
-    std::cout << "photodissociation rate: " << total_rate << std::endl;
-    std::cout << "photoabsorption rate: " << m_photoabsorption_rate << std::endl;
-    */
+    std::cout << "photodissociation rate: " << total_rate << std::endl;*/
 
     delete [] cross1;
     delete [] cross2;
