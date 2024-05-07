@@ -336,6 +336,23 @@ void PhotolysisBase::validate(string const& equation, Kinetics const& kin)
   }
 }
 
+vector<double> PhotolysisBase::getCrossSection(double temp, double wavelength) const
+{
+  if (m_crossSection.empty()) {
+    return {0.};
+  }
+
+  std::vector<double> cross(m_branch.size());
+
+  double coord[2] = {temp, wavelength};
+  size_t len[2] = {m_ntemp, m_nwave};
+
+  interpn(cross.data(), coord, m_crossSection.data(), m_temp_wave_grid.data(),
+      len, 2, m_branch.size());
+
+  return cross;
+}
+
 double PhotolysisRate::evalFromStruct(PhotolysisData const& data) {
     double wmin = m_temp_wave_grid[m_ntemp];
     double wmax = m_temp_wave_grid.back();
@@ -344,7 +361,10 @@ double PhotolysisRate::evalFromStruct(PhotolysisData const& data) {
         wmin > data.wavelength.back() || 
         wmax < data.wavelength.front()) 
     {
-      m_photoabsorption_rate = 0.;
+      for (size_t n = 1; n < m_branch.size(); n++)
+        for (auto const& [name, stoich] : m_branch[n])
+          m_net_products[name] = 0.;
+
       return 0.;
     }
 
@@ -354,7 +374,8 @@ double PhotolysisRate::evalFromStruct(PhotolysisData const& data) {
     std::cout << "wavelength = " << std::endl;
     for (auto w : data.wavelength) {
       std::cout << w << std::endl;
-    }*/
+    }
+    std::cout << "nbranch = " << m_branch.size() << std::endl;*/
 
     double* cross1 = new double [m_branch.size()];
     double* cross2 = new double [m_branch.size()];
@@ -374,18 +395,16 @@ double PhotolysisRate::evalFromStruct(PhotolysisData const& data) {
     double total_rate_eps = 0.;
 
     // first branch is photoabsorption
-    m_photoabsorption_rate = 0.;
-    for (size_t n = 1; n < m_branch.size(); n++) {
+    for (size_t n = 1; n < m_branch.size(); n++)
       for (auto const& [name, stoich] : m_branch[n])
         m_net_products[name] = 0.;
-    }
 
     /* debug
     std::cout << m_crossSection[0] << std::endl;
     std::cout << m_crossSection[1] << std::endl;
     std::cout << m_crossSection[2] << std::endl;
     std::cout << "grid = " << std::endl;
-    for (int n = 0; n < m_temp_wave_grid.size(); n++) {
+    for (size_t n = 0; n < m_temp_wave_grid.size(); n++) {
       std::cout << m_temp_wave_grid[n] << std::endl;
     }*/
 
@@ -396,22 +415,20 @@ double PhotolysisRate::evalFromStruct(PhotolysisData const& data) {
       interpn(cross2, coord, m_crossSection.data(), m_temp_wave_grid.data(),
           len, 2, m_branch.size());
 
-      for (size_t n = 0; n < m_branch.size(); n++) {
+      // photodissociation only
+      for (size_t n = 1; n < m_branch.size(); n++) {
         double rate = 0.5 * (data.wavelength[i+1] - data.wavelength[i])
           * (cross1[n] * data.actinicFlux[i] + cross2[n] * data.actinicFlux[i+1]);
 
         // debug
+        //std::cout << "actinic flux [ " << i << "] = " << data.actinicFlux[i] << " " << data.actinicFlux[i+1] << std::endl;
         //std::cout << "cross section [ " << n << "] = " << cross1[n] << " " << cross2[n] << std::endl;
         
-        if (n == 0) { // photoabsorption
-          m_photoabsorption_rate += rate;
-        } else {  // photodissociation
-          for (auto const& [name, stoich] : m_branch[n]) {
-            m_net_products.at(name) += (rate + eps) * stoich;
-          }
-          total_rate += rate;
-          total_rate_eps += rate + eps;
+        for (auto const& [name, stoich] : m_branch[n]) {
+          m_net_products.at(name) += (rate + eps) * stoich;
         }
+        total_rate += rate;
+        total_rate_eps += rate + eps;
 
         cross1[n] = cross2[n];
       }
@@ -423,9 +440,7 @@ double PhotolysisRate::evalFromStruct(PhotolysisData const& data) {
     /* debug
     for (auto const& [name, stoich] : m_net_products)
       std::cout << name << " " << stoich << std::endl;
-    std::cout << "photodissociation rate: " << total_rate << std::endl;
-    std::cout << "photoabsorption rate: " << m_photoabsorption_rate << std::endl;
-    */
+    std::cout << "photodissociation rate: " << total_rate << std::endl;*/
 
     delete [] cross1;
     delete [] cross2;

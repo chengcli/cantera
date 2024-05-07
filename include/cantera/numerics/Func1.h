@@ -105,6 +105,16 @@ public:
     //! Calls method eval to evaluate the function
     double operator()(double t) const;
 
+    //! Evaluate the function with one additional arguments
+    virtual double eval(double t, double *x) {
+      return eval(t);
+    }
+
+    //! Evaluate the function with two additional arguments
+    virtual double eval(double t, double *x, double *y) {
+      return eval(t);
+    }
+
     //! Evaluate the function.
     virtual double eval(double t) const;
 
