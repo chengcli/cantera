@@ -1430,9 +1430,10 @@ public:
         }
 
         if ((il  + 1) * nWavelengths() > m_actinicFlux.lock()->size()) {
+            auto max_levels = m_actinicFlux.lock()->size() / nWavelengths();
             throw CanteraError("Kinetics::setActinicFluxLevel",
-                               "Requested start index {} is out of bounds for actinic flux vector of length {}",
-                               il, nWavelengths());
+                               "Requested end level {} is out of bounds for actinic flux vector of length {}",
+                               (il + 1), max_levels);
         }
 
         if (il != m_actinicFluxLevel) {
