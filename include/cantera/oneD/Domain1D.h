@@ -523,6 +523,8 @@ public:
         m_state = data;
     }
 
+    virtual void update(double const *y) {}
+
     //----------------------------------------
     //        Tri-diagonal matrix solver
     //----------------------------------------

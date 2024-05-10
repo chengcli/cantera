@@ -63,7 +63,7 @@ public:
         return *m_dom[i];
     }
 
-    size_t domainIndex(const string& name);
+    size_t domainIndex(const string& name) const;
 
     //! Check that the specified domain index is in range.
     //! Throws an exception if n is greater than nDomains()-1
