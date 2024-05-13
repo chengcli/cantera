@@ -381,13 +381,12 @@ double PhotolysisRate::evalFromStruct(PhotolysisData const& data) {
     size_t len[2] = {m_ntemp, m_nwave};
  
 
-<<<<<<< HEAD
+
     //N-space interpolation to determine photolysis cross section
-=======
     // debug
     //std::cout << "coord = " << coord[0] << " " << coord[1] << std::endl;
 
->>>>>>> origin/main
+
     interpn(cross1, coord, m_crossSection.data(), m_temp_wave_grid.data(),
         len, 2, m_branch.size());
 
