@@ -7,6 +7,8 @@
 #define CT_DOMAIN1D_H
 
 #include "cantera/base/ctexceptions.h"
+#include "cantera/numerics/eigen_dense.h"
+#include "cantera/numerics/eigen_sparse.h"
 
 namespace Cantera
 {
@@ -365,7 +367,7 @@ public:
         return m_solution;
     }
 
-    size_t size() const {
+    virtual size_t size() const {
         return m_nv*m_points;
     }
 
@@ -521,6 +523,17 @@ public:
         m_state = data;
     }
 
+    virtual void update(double const *y) {}
+
+    //----------------------------------------
+    //        Tri-diagonal matrix solver
+    //----------------------------------------
+    Domain1D* forwardSweep(double const *residual);
+    Domain1D* backwardSweep(double *result);
+    virtual void modifyLeft(Eigen::VectorXd &delta) {}
+    virtual void modifyRight(Eigen::SparseMatrix<double> &a,
+                             Eigen::VectorXd &delta) {}
+
 protected:
     //! Retrieve meta data
     virtual AnyMap getMeta() const;
@@ -563,6 +576,10 @@ protected:
 
     //! Composite thermo/kinetics/transport handler
     shared_ptr<Solution> m_solution;
+
+    //! tri-diagonal matrices 
+    vector<Eigen::SparseMatrix<double>> m_A, m_B, m_C;
+    vector<Eigen::VectorXd> m_D;
 };
 }
 

@@ -51,7 +51,7 @@ public:
      * @param x1         Final solution satisfying F(x1) = 0.
      * @param loglevel   Controls amount of diagnostic output.
      */
-    int solve(double* x0, double* x1, int loglevel);
+    virtual int solve(double* x0, double* x1, int loglevel);
 
     //! Number of domains.
     size_t nDomains() const {
@@ -63,7 +63,7 @@ public:
         return *m_dom[i];
     }
 
-    size_t domainIndex(const string& name);
+    size_t domainIndex(const string& name) const;
 
     //! Check that the specified domain index is in range.
     //! Throws an exception if n is greater than nDomains()-1
