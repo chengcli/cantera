@@ -295,4 +295,8 @@ double Domain1D::initialValue(size_t n, size_t j)
     throw NotImplementedError("Domain1D::initialValue");
 }
 
+size_t Domain1D::nSpecies() const {
+  return m_solution->thermo()->nSpecies(); 
+}
+
 } // namespace

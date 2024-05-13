@@ -63,10 +63,6 @@ public:
         return m_temp;
     }
 
-    virtual size_t nSpecies() {
-        return 0;
-    }
-
     //! Set the mole fractions by specifying a string.
     virtual void setMoleFractions(const string& xin) {
         throw NotImplementedError("Boundary1D::setMoleFractions");
@@ -154,7 +150,7 @@ public:
 
     void show(const double* x) override;
 
-    size_t nSpecies() override {
+    size_t nSpecies() const override {
         return m_nsp;
     }
 
@@ -272,7 +268,7 @@ public:
 
     void show(const double* x) override {}
 
-    size_t nSpecies() override {
+    size_t nSpecies() const override {
         return m_nsp;
     }
 

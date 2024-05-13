@@ -534,6 +534,13 @@ public:
     virtual void modifyRight(Eigen::SparseMatrix<double> &a,
                              Eigen::VectorXd &delta) {}
 
+    //! @return number of species
+    virtual size_t nSpecies() const;
+
+    Eigen::SparseMatrix<double>& A(size_t j) { return m_A[j]; }
+    Eigen::SparseMatrix<double>& B(size_t j) { return m_B[j]; }
+    Eigen::SparseMatrix<double>& C(size_t j) { return m_C[j]; }
+
 protected:
     //! Retrieve meta data
     virtual AnyMap getMeta() const;
