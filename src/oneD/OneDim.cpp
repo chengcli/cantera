@@ -367,8 +367,14 @@ double OneDim::timeStep(int nsteps, double dt, double* x, double* r, int logleve
             if (m == 100) {
                 dt *= 1.5;
             }
+
+            // update domain cache
+            for (size_t n = 0; n < nDomains(); n++) {
+                domain(n).update(x + start(n));
+            }
+
             if (m_time_step_callback) {
-                m_time_step_callback->eval(dt, r);
+                m_time_step_callback->eval(dt, x);
             }
             dt = std::min(dt, m_tmax);
             if (m_nsteps >= m_nsteps_max) {
