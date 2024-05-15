@@ -50,10 +50,11 @@ public:
     /*!
      *  @param A  Pre-exponential factor. The unit system is (kmol, m, s); actual units
      *      depend on the reaction order and the dimensionality (surface or bulk).
+     *  @param T0 Reference temperature (K)
      *  @param b  Temperature exponent (non-dimensional)
      *  @param Ea  Activation energy in energy units [J/kmol]
      */
-    ArrheniusBase(double A, double b, double Ea);
+    ArrheniusBase(double A, double b,double T0,double Ea);
 
     //! Constructor based on AnyValue content
     ArrheniusBase(const AnyValue& rate, const UnitSystem& units,
@@ -146,12 +147,14 @@ protected:
     bool m_negativeA_ok = false; //!< Permissible negative A values
     double m_A = NAN; //!< Pre-exponential factor
     double m_b = NAN; //!< Temperature exponent
+    double m_T0 = 1.0; //!< Reference temperature
     double m_Ea_R = 0.; //!< Activation energy (in temperature units)
     double m_E4_R = 0.; //!< Optional 4th energy parameter (in temperature units)
     double m_logA = NAN; //!< Logarithm of pre-exponential factor
     double m_order = NAN; //!< Reaction order
     string m_A_str = "A"; //!< The string for the pre-exponential factor
     string m_b_str = "b"; //!< The string for temperature exponent
+    string m_T0_str = "T0"; //!< The string for reference temperature
     string m_Ea_str = "Ea"; //!< The string for activation energy
     string m_E4_str = ""; //!< The string for an optional 4th parameter
 };
@@ -161,7 +164,7 @@ protected:
  * A reaction rate coefficient of the following form.
  *
  *   @f[
- *        k_f =  A T^b \exp (-Ea/RT)
+ *        k_f =  A (T/T0)^b \exp (-Ea/RT)
  *   @f]
  *
  * @ingroup arrheniusGroup
@@ -176,17 +179,17 @@ public:
     }
 
     const string type() const override {
-        return "Arrhenius";
+        return "T-Arrhenius";
     }
 
     //! Evaluate reaction rate
     double evalRate(double logT, double recipT) const {
-        return m_A * std::exp(m_b * logT - m_Ea_R * recipT);
+        return m_A * std::exp((m_b * (logT - std::log(m_T0))) - (m_Ea_R * recipT));
     }
 
     //! Evaluate natural logarithm of the rate constant.
     double evalLog(double logT, double recipT) const {
-        return m_logA + m_b * logT - m_Ea_R * recipT;
+        return m_logA + (m_b * (logT - std::log(m_T0))) - (m_Ea_R * recipT);
     }
 
     //! Evaluate reaction rate
@@ -194,7 +197,7 @@ public:
      *  @param shared_data  data shared by all reactions of a given type
      */
     double evalFromStruct(const ArrheniusData& shared_data) const {
-        return m_A * std::exp(m_b * shared_data.logT - m_Ea_R * shared_data.recipT);
+        return m_A * std::exp((m_b * (shared_data.logT - std::log(m_T0))) - (m_Ea_R * shared_data.recipT));
     }
 
     //! Evaluate derivative of reaction rate with respect to temperature

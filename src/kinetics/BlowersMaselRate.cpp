@@ -42,8 +42,8 @@ BlowersMaselRate::BlowersMaselRate()
     m_E4_str = "w";
 }
 
-BlowersMaselRate::BlowersMaselRate(double A, double b, double Ea0, double w)
-    : ArrheniusBase(A, b, Ea0)
+BlowersMaselRate::BlowersMaselRate(double A, double b, double T0, double Ea0, double w)
+    : ArrheniusBase(A, b, T0, Ea0)
 {
     m_Ea_str = "Ea0";
     m_E4_str = "w";
