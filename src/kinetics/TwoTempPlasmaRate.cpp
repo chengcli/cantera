@@ -51,8 +51,8 @@ TwoTempPlasmaRate::TwoTempPlasmaRate()
     m_E4_str = "Ea-electron";
 }
 
-TwoTempPlasmaRate::TwoTempPlasmaRate(double A, double b, double Ea, double EE)
-    : ArrheniusBase(A, b, Ea)
+TwoTempPlasmaRate::TwoTempPlasmaRate(double A, double b, double T0, double Ea, double EE)
+    : ArrheniusBase(A, b, T0, Ea)
 {
     m_Ea_str = "Ea-gas";
     m_E4_str = "Ea-electron";

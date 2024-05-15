@@ -67,10 +67,11 @@ public:
      *  @param A  Pre-exponential factor. The unit system is (kmol, m, s); actual units
      *      depend on the reaction order and the dimensionality (surface or bulk).
      *  @param b  Temperature exponent (non-dimensional)
+     *  @param T0 Reference temperature (K)
      *  @param Ea  Activation energy in energy units [J/kmol]
      *  @param EE  Activation electron energy in energy units [J/kmol]
      */
-    TwoTempPlasmaRate(double A, double b, double Ea=0.0, double EE=0.0);
+    TwoTempPlasmaRate(double A, double b, double T0, double Ea=0.0, double EE=0.0);
 
     TwoTempPlasmaRate(const AnyMap& node, const UnitStack& rate_units={});
 
