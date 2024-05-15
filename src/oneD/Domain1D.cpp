@@ -252,6 +252,7 @@ void Domain1D::show(const double* x)
         writelog("\n");
     }
     size_t nrem = m_nv - 5*nn;
+    if (nrem == 0) return;
     writeline('-', 79, false, true);
     writelog("\n          z ");
     for (size_t n = 0; n < nrem; n++) {
@@ -293,6 +294,10 @@ void Domain1D::_getInitialSoln(double* x)
 double Domain1D::initialValue(size_t n, size_t j)
 {
     throw NotImplementedError("Domain1D::initialValue");
+}
+
+size_t Domain1D::nSpecies() const {
+  return m_solution->thermo()->nSpecies(); 
 }
 
 } // namespace
