@@ -81,7 +81,7 @@ public:
      *  @param w  Average bond dissociation energy of the bond being formed and
      *      broken in the reaction, in energy units [J/kmol]
      */
-    BlowersMaselRate(double A, double b, double Ea0, double w);
+    BlowersMaselRate(double A, double b, double T0, double Ea0, double w);
 
     explicit BlowersMaselRate(const AnyMap& node,
                               const UnitStack& rate_units={});

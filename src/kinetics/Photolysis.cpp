@@ -44,11 +44,13 @@ bool PhotolysisData::check() const
                            "Wavelength grid must have at least two points.");
     }
 
+    // Check that wavelength grid values are positive
     if (wavelength[0] <= 0.0) {
         throw CanteraError("PhotolysisData::update",
                            "Wavelength grid must be positive.");
     }
 
+    // Check that wavelength grid values are monotonic and increasing
     for (size_t i = 1; i < wavelength.size(); i++) {
         if (wavelength[i] <= wavelength[i-1]) {
             throw CanteraError("PhotolysisData::update",
@@ -61,12 +63,14 @@ bool PhotolysisData::check() const
         throw CanteraError("PhotolysisData::update",
                            "Actinic flux is empty.");
     }
-
+    
+    // Check that actinic flux grid should have same size as wavelength grid
     if (actinicFlux.size() != wavelength.size()) {
         throw CanteraError("PhotolysisData::update",
                            "Actinic flux must have the same size as the wavelength grid.");
     }
 
+    // Check that actinic flux values are positive
     for (size_t i = 0; i < actinicFlux.size(); i++) {
         if (actinicFlux[i] < 0.0) {
             throw CanteraError("PhotolysisData::update",
@@ -87,6 +91,7 @@ PhotolysisBase::PhotolysisBase(
   m_ntemp = temp.size();
   m_nwave = wavelength.size();
 
+ // Grid for temperature and wavelength
   m_temp_wave_grid.resize(m_ntemp + m_nwave);
   for (size_t i = 0; i < m_ntemp; i++) {
     m_temp_wave_grid[i] = temp[i];
@@ -100,6 +105,7 @@ PhotolysisBase::PhotolysisBase(
     m_branch.push_back(parseCompString(branch));
   }
 
+  // Check if cross-section data size 
   if (m_ntemp * m_nwave * branches.size() != m_crossSection.size()) {
     throw CanteraError("PhotolysisBase::PhotolysisBase",
                        "Cross-section data size does not match the temperature, "
@@ -182,16 +188,19 @@ void PhotolysisBase::setParameters(AnyMap const& node, UnitStack const& rate_uni
   } else if (rtmp.products != rtmp.reactants) { // this is not photoabsorption
     m_branch.push_back(rtmp.products);
   }
-
+   
   if (node.hasKey("cross-section")) {
     for (auto const& data: node["cross-section"].asVector<AnyMap>()) {
       auto format = data["format"].asString();
       auto temp = data["temperature-range"].asVector<double>(2, 2);
+      
+      //Check temperature range to be monotonically increasing
       if (temp[0] >= temp[1]) {
         throw CanteraError("PhotolysisBase::setParameters",
                            "Temperature range must be strictly increasing.");
       }
-
+      
+      //Check for gaps in temperature range
       if (temperature.empty()) {
         temperature = temp;
       } else {
@@ -209,9 +218,12 @@ void PhotolysisBase::setParameters(AnyMap const& node, UnitStack const& rate_uni
           result.first.push_back(entry[0]);
           result.second.push_back(entry[1]);
         }
+      
+      //Read file names for VULCAN photochemistry database
       } else if (format == "VULCAN") {
         auto files = data["filenames"].asVector<string>();
         result = load_xsection_vulcan(files, m_branch);
+      //Read file name for KINETICS photochemistry database
       } else if (format == "KINETICS7") {
         auto files = data["filenames"].asVector<string>();
         result = load_xsection_kinetics7(files, m_branch);
@@ -267,11 +279,13 @@ void PhotolysisBase::setParameters(AnyMap const& node, UnitStack const& rate_uni
   m_valid = true;
 }
 
+ //Set the rate parameters to flow style ?? (TBD)
 void PhotolysisBase::getRateParameters(AnyMap& node) const
 {
   node.setFlowStyle();
 }
 
+ //Get rate parameters for photolysis reaction
 void PhotolysisBase::getParameters(AnyMap& node) const
 {
   AnyMap rateNode;
@@ -282,6 +296,7 @@ void PhotolysisBase::getParameters(AnyMap& node) const
   }
 }
 
+//Check temperature range, and wavelength data for photolysis reactions
 void PhotolysisBase::check(string const& equation)
 {
   if (m_ntemp < 2) {
@@ -296,6 +311,7 @@ void PhotolysisBase::check(string const& equation)
   }
 }
 
+//Check rate coefficient 
 void PhotolysisBase::validate(string const& equation, Kinetics const& kin)
 {
   if (!valid()) {
@@ -330,6 +346,7 @@ void PhotolysisBase::validate(string const& equation, Kinetics const& kin)
     }
   }
 
+  // Check for consistency in species in reaction string, and photolysis branches
   if (species_from_equation != species_from_branches) {
     throw InputFileError("PhotolysisBase::validate", m_input,
                        "Reaction '{}' has different products than the photolysis branches.", equation);
@@ -353,6 +370,7 @@ vector<double> PhotolysisBase::getCrossSection(double temp, double wavelength) c
   return cross;
 }
 
+// Evaluate the photolysis rate, and update the stoichiometric coefficient for different branches
 double PhotolysisRate::evalFromStruct(PhotolysisData const& data) {
     double wmin = m_temp_wave_grid[m_ntemp];
     double wmax = m_temp_wave_grid.back();
@@ -382,10 +400,9 @@ double PhotolysisRate::evalFromStruct(PhotolysisData const& data) {
 
     double coord[2] = {data.temperature, data.wavelength[0]};
     size_t len[2] = {m_ntemp, m_nwave};
+ 
 
-    // debug
-    //std::cout << "coord = " << coord[0] << " " << coord[1] << std::endl;
-
+    // N-space interpolation to determine photolysis cross section
     interpn(cross1, coord, m_crossSection.data(), m_temp_wave_grid.data(),
         len, 2, m_branch.size());
 
@@ -417,6 +434,7 @@ double PhotolysisRate::evalFromStruct(PhotolysisData const& data) {
 
       // photodissociation only
       for (size_t n = 1; n < m_branch.size(); n++) {
+        //Photochemical rate constant
         double rate = 0.5 * (data.wavelength[i+1] - data.wavelength[i])
           * (cross1[n] * data.actinicFlux[i] + cross2[n] * data.actinicFlux[i+1]);
 

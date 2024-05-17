@@ -9,9 +9,10 @@
 namespace Cantera
 {
 
-ArrheniusBase::ArrheniusBase(double A, double b, double Ea)
+ArrheniusBase::ArrheniusBase(double A, double b, double T0, double Ea)
     : m_A(A)
     , m_b(b)
+    , m_T0(T0)
     , m_Ea_R(Ea / GasConstant)
 {
     if (m_A > 0.0) {
@@ -40,6 +41,7 @@ void ArrheniusBase::setRateParameters(
     if (rate.empty()) {
         m_A = NAN;
         m_b = NAN;
+	m_T0 = 1.0;
         m_logA = NAN;
         setRateUnits(Units(0.));
         return;
@@ -50,6 +52,7 @@ void ArrheniusBase::setRateParameters(
         auto& rate_map = rate.as<AnyMap>();
         m_A = units.convertRateCoeff(rate_map[m_A_str], conversionUnits());
         m_b = rate_map[m_b_str].asDouble();
+	m_T0 = rate_map[m_T0_str].asDouble();
         if (rate_map.hasKey(m_Ea_str)) {
             m_Ea_R = units.convertActivationEnergy(rate_map[m_Ea_str], "K");
         }
@@ -90,6 +93,7 @@ void ArrheniusBase::getRateParameters(AnyMap& node) const
         node["__unconvertible__"] = true;
     }
     node[m_b_str] = m_b;
+    node[m_T0_str] = m_T0;
     node[m_Ea_str].setQuantity(m_Ea_R, "K", true);
     if (m_E4_str != "") {
         node[m_E4_str].setQuantity(m_E4_R, "K", true);
