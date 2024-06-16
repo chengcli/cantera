@@ -1,0 +1,12 @@
+diff --git a/src/kinetics/ReactionRateFactory.cpp b/src/kinetics/ReactionRateFactory.cpp
+index 605447768..41a19cbc8 100644
+--- a/src/kinetics/ReactionRateFactory.cpp
++++ b/src/kinetics/ReactionRateFactory.cpp
+@@ -85,6 +85,7 @@ ReactionRateFactory::ReactionRateFactory()
+     reg("custom-rate-function", [](const AnyMap& node, const UnitStack& rate_units) {
+         return new CustomFunc1Rate(node, rate_units);
+     });
++    addAlias("custom-rate-function", "custom");
+ 
+     // InterfaceArrheniusRate evaluator
+     reg("interface-Arrhenius", [](const AnyMap& node, const UnitStack& rate_units) {

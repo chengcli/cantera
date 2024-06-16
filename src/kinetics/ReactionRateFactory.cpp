@@ -85,6 +85,7 @@ ReactionRateFactory::ReactionRateFactory()
     reg("custom-rate-function", [](const AnyMap& node, const UnitStack& rate_units) {
         return new CustomFunc1Rate(node, rate_units);
     });
+    addAlias("custom-rate-function", "custom");
 
     // InterfaceArrheniusRate evaluator
     reg("interface-Arrhenius", [](const AnyMap& node, const UnitStack& rate_units) {

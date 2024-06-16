@@ -1,0 +1,413 @@
+diff --git a/INSTALL.sh b/INSTALL.sh
+new file mode 100644
+index 000000000..0e158dff6
+--- /dev/null
++++ b/INSTALL.sh
+@@ -0,0 +1,20 @@
++CXX=g++
++CC=gcc
++cxx_flags="-std=c++17"
++prefix=${HOME}/opt/
++python_package=n
++f90_interface=n
++system_eigen=n
++extra_inc_dirs="/opt/include /usr/include/yaml-cpp"  # Include both directories
++system_blas_lapack=n
++boost_inc_dir=$(pwd)/ext/cliboost
++system_sundials=n
++system_yamlcpp=n
++
++scons build CXX=${CXX} CC=${CC} cxx_flags="${cxx_flags}" prefix=${prefix} \
++ python_package=${python_package} f90_interface=${f90_interface} \
++ system_eigen=${system_eigen} extra_inc_dirs="${extra_inc_dirs}" \
++ system_blas_lapack=${system_blas_lapack} boost_inc_dir=${boost_inc_dir} system_sundials=${system_sundials} \
++ system_yamlcpp=${system_yamlcpp} -j8
++
++scons install
+diff --git a/include/cantera/kinetics/Arrhenius.h b/include/cantera/kinetics/Arrhenius.h
+index 2791faca8..da5806ec0 100644
+--- a/include/cantera/kinetics/Arrhenius.h
++++ b/include/cantera/kinetics/Arrhenius.h
+@@ -50,10 +50,11 @@ public:
+     /*!
+      *  @param A  Pre-exponential factor. The unit system is (kmol, m, s); actual units
+      *      depend on the reaction order and the dimensionality (surface or bulk).
++     *  @param T0 Reference temperature (K)
+      *  @param b  Temperature exponent (non-dimensional)
+      *  @param Ea  Activation energy in energy units [J/kmol]
+      */
+-    ArrheniusBase(double A, double b, double Ea);
++    ArrheniusBase(double A, double b,double T0,double Ea);
+ 
+     //! Constructor based on AnyValue content
+     ArrheniusBase(const AnyValue& rate, const UnitSystem& units,
+@@ -146,12 +147,14 @@ protected:
+     bool m_negativeA_ok = false; //!< Permissible negative A values
+     double m_A = NAN; //!< Pre-exponential factor
+     double m_b = NAN; //!< Temperature exponent
++    double m_T0 = 1.0; //!< Reference temperature
+     double m_Ea_R = 0.; //!< Activation energy (in temperature units)
+     double m_E4_R = 0.; //!< Optional 4th energy parameter (in temperature units)
+     double m_logA = NAN; //!< Logarithm of pre-exponential factor
+     double m_order = NAN; //!< Reaction order
+     string m_A_str = "A"; //!< The string for the pre-exponential factor
+     string m_b_str = "b"; //!< The string for temperature exponent
++    string m_T0_str = "T0"; //!< The string for reference temperature
+     string m_Ea_str = "Ea"; //!< The string for activation energy
+     string m_E4_str = ""; //!< The string for an optional 4th parameter
+ };
+@@ -161,7 +164,7 @@ protected:
+  * A reaction rate coefficient of the following form.
+  *
+  *   @f[
+- *        k_f =  A T^b \exp (-Ea/RT)
++ *        k_f =  A (T/T0)^b \exp (-Ea/RT)
+  *   @f]
+  *
+  * @ingroup arrheniusGroup
+@@ -176,17 +179,17 @@ public:
+     }
+ 
+     const string type() const override {
+-        return "Arrhenius";
++        return "T-Arrhenius";
+     }
+ 
+     //! Evaluate reaction rate
+     double evalRate(double logT, double recipT) const {
+-        return m_A * std::exp(m_b * logT - m_Ea_R * recipT);
++        return m_A * std::exp((m_b * (logT - std::log(m_T0))) - (m_Ea_R * recipT));
+     }
+ 
+     //! Evaluate natural logarithm of the rate constant.
+     double evalLog(double logT, double recipT) const {
+-        return m_logA + m_b * logT - m_Ea_R * recipT;
++        return m_logA + (m_b * (logT - std::log(m_T0))) - (m_Ea_R * recipT);
+     }
+ 
+     //! Evaluate reaction rate
+@@ -194,7 +197,7 @@ public:
+      *  @param shared_data  data shared by all reactions of a given type
+      */
+     double evalFromStruct(const ArrheniusData& shared_data) const {
+-        return m_A * std::exp(m_b * shared_data.logT - m_Ea_R * shared_data.recipT);
++        return m_A * std::exp((m_b * (shared_data.logT - std::log(m_T0))) - (m_Ea_R * shared_data.recipT));
+     }
+ 
+     //! Evaluate derivative of reaction rate with respect to temperature
+diff --git a/include/cantera/kinetics/BlowersMaselRate.h b/include/cantera/kinetics/BlowersMaselRate.h
+index d10db0b72..cbef45a7a 100644
+--- a/include/cantera/kinetics/BlowersMaselRate.h
++++ b/include/cantera/kinetics/BlowersMaselRate.h
+@@ -81,7 +81,7 @@ public:
+      *  @param w  Average bond dissociation energy of the bond being formed and
+      *      broken in the reaction, in energy units [J/kmol]
+      */
+-    BlowersMaselRate(double A, double b, double Ea0, double w);
++    BlowersMaselRate(double A, double b, double T0, double Ea0, double w);
+ 
+     explicit BlowersMaselRate(const AnyMap& node,
+                               const UnitStack& rate_units={});
+diff --git a/include/cantera/kinetics/Photolysis.h b/include/cantera/kinetics/Photolysis.h
+index ee9b4c0cf..358e9f5b3 100644
+--- a/include/cantera/kinetics/Photolysis.h
++++ b/include/cantera/kinetics/Photolysis.h
+@@ -1,4 +1,6 @@
+-//! @file Photolysis.h
++/** @file Photolysis.h
++ * Header for reaction rates that involve Photochemical reactions
++ */
+ 
+ #ifndef CT_PHOTOLYSIS_H
+ #define CT_PHOTOLYSIS_H
+@@ -69,12 +71,16 @@ class PhotolysisBase : public ReactionRate {
+   //! @param branch_map Map of branch names to branch indices
+   void setRateParameters(const AnyValue& rate, map<string, int> const& branch_map);
+ 
++  //! Get the parameters corresponding to node rate-constant
+   void getParameters(AnyMap& node) const override;
+ 
++  //! Get the parameters for a given node with flow style output
+   void getRateParameters(AnyMap& node) const;
+ 
++  //! Checks for temperature range, and wavelength data
+   void check(string const& equation) override;
+ 
++  //! Checks for valid species, stoichiometric balance, and consistency with photolysis branches
+   void validate(const string& equation, const Kinetics& kin) override;
+ 
+   vector<double> getCrossSection(double temp, double wavelength) const;
+@@ -122,14 +128,21 @@ class PhotolysisRate : public PhotolysisBase {
+     return make_unique<MultiRate<PhotolysisRate, PhotolysisData>>();
+   }
+ 
++  //! reaction string type for photolysis reactions
+   const string type() const override {
+     return "Photolysis";
+   }
+-
++  
++  //! net stoichiometric coefficients of photolysis products
+   Composition const& photoProducts() const override {
+     return m_net_products;
+   }
+ 
++/**
++ * @brief Calculates the photolysis reaction rate and updates stoichiometric concentration of products
++ * 
++ * @return total photolysis rate from all the branches
++ */
+   double evalFromStruct(PhotolysisData const& data);
+ 
+  protected:
+diff --git a/include/cantera/kinetics/TwoTempPlasmaRate.h b/include/cantera/kinetics/TwoTempPlasmaRate.h
+index 7f17e9de7..f09f11b55 100644
+--- a/include/cantera/kinetics/TwoTempPlasmaRate.h
++++ b/include/cantera/kinetics/TwoTempPlasmaRate.h
+@@ -67,10 +67,11 @@ public:
+      *  @param A  Pre-exponential factor. The unit system is (kmol, m, s); actual units
+      *      depend on the reaction order and the dimensionality (surface or bulk).
+      *  @param b  Temperature exponent (non-dimensional)
++     *  @param T0 Reference temperature (K)
+      *  @param Ea  Activation energy in energy units [J/kmol]
+      *  @param EE  Activation electron energy in energy units [J/kmol]
+      */
+-    TwoTempPlasmaRate(double A, double b, double Ea=0.0, double EE=0.0);
++    TwoTempPlasmaRate(double A, double b, double T0, double Ea=0.0, double EE=0.0);
+ 
+     TwoTempPlasmaRate(const AnyMap& node, const UnitStack& rate_units={});
+ 
+diff --git a/src/kinetics/Arrhenius.cpp b/src/kinetics/Arrhenius.cpp
+index ecd89b203..6418fca65 100644
+--- a/src/kinetics/Arrhenius.cpp
++++ b/src/kinetics/Arrhenius.cpp
+@@ -9,9 +9,10 @@
+ namespace Cantera
+ {
+ 
+-ArrheniusBase::ArrheniusBase(double A, double b, double Ea)
++ArrheniusBase::ArrheniusBase(double A, double b, double T0, double Ea)
+     : m_A(A)
+     , m_b(b)
++    , m_T0(T0)
+     , m_Ea_R(Ea / GasConstant)
+ {
+     if (m_A > 0.0) {
+@@ -40,6 +41,7 @@ void ArrheniusBase::setRateParameters(
+     if (rate.empty()) {
+         m_A = NAN;
+         m_b = NAN;
++	m_T0 = 1.0;
+         m_logA = NAN;
+         setRateUnits(Units(0.));
+         return;
+@@ -50,6 +52,7 @@ void ArrheniusBase::setRateParameters(
+         auto& rate_map = rate.as<AnyMap>();
+         m_A = units.convertRateCoeff(rate_map[m_A_str], conversionUnits());
+         m_b = rate_map[m_b_str].asDouble();
++	m_T0 = rate_map[m_T0_str].asDouble();
+         if (rate_map.hasKey(m_Ea_str)) {
+             m_Ea_R = units.convertActivationEnergy(rate_map[m_Ea_str], "K");
+         }
+@@ -90,6 +93,7 @@ void ArrheniusBase::getRateParameters(AnyMap& node) const
+         node["__unconvertible__"] = true;
+     }
+     node[m_b_str] = m_b;
++    node[m_T0_str] = m_T0;
+     node[m_Ea_str].setQuantity(m_Ea_R, "K", true);
+     if (m_E4_str != "") {
+         node[m_E4_str].setQuantity(m_E4_R, "K", true);
+diff --git a/src/kinetics/BlowersMaselRate.cpp b/src/kinetics/BlowersMaselRate.cpp
+index c51d8d718..528d17a13 100644
+--- a/src/kinetics/BlowersMaselRate.cpp
++++ b/src/kinetics/BlowersMaselRate.cpp
+@@ -42,8 +42,8 @@ BlowersMaselRate::BlowersMaselRate()
+     m_E4_str = "w";
+ }
+ 
+-BlowersMaselRate::BlowersMaselRate(double A, double b, double Ea0, double w)
+-    : ArrheniusBase(A, b, Ea0)
++BlowersMaselRate::BlowersMaselRate(double A, double b, double T0, double Ea0, double w)
++    : ArrheniusBase(A, b, T0, Ea0)
+ {
+     m_Ea_str = "Ea0";
+     m_E4_str = "w";
+diff --git a/src/kinetics/Photolysis.cpp b/src/kinetics/Photolysis.cpp
+index 67d2ccb87..a87a8802d 100644
+--- a/src/kinetics/Photolysis.cpp
++++ b/src/kinetics/Photolysis.cpp
+@@ -44,11 +44,13 @@ bool PhotolysisData::check() const
+                            "Wavelength grid must have at least two points.");
+     }
+ 
++    // Check that wavelength grid values are positive
+     if (wavelength[0] <= 0.0) {
+         throw CanteraError("PhotolysisData::update",
+                            "Wavelength grid must be positive.");
+     }
+ 
++    // Check that wavelength grid values are monotonic and increasing
+     for (size_t i = 1; i < wavelength.size(); i++) {
+         if (wavelength[i] <= wavelength[i-1]) {
+             throw CanteraError("PhotolysisData::update",
+@@ -61,12 +63,14 @@ bool PhotolysisData::check() const
+         throw CanteraError("PhotolysisData::update",
+                            "Actinic flux is empty.");
+     }
+-
++    
++    // Check that actinic flux grid should have same size as wavelength grid
+     if (actinicFlux.size() != wavelength.size()) {
+         throw CanteraError("PhotolysisData::update",
+                            "Actinic flux must have the same size as the wavelength grid.");
+     }
+ 
++    // Check that actinic flux values are positive
+     for (size_t i = 0; i < actinicFlux.size(); i++) {
+         if (actinicFlux[i] < 0.0) {
+             throw CanteraError("PhotolysisData::update",
+@@ -87,6 +91,7 @@ PhotolysisBase::PhotolysisBase(
+   m_ntemp = temp.size();
+   m_nwave = wavelength.size();
+ 
++ // Grid for temperature and wavelength
+   m_temp_wave_grid.resize(m_ntemp + m_nwave);
+   for (size_t i = 0; i < m_ntemp; i++) {
+     m_temp_wave_grid[i] = temp[i];
+@@ -100,6 +105,7 @@ PhotolysisBase::PhotolysisBase(
+     m_branch.push_back(parseCompString(branch));
+   }
+ 
++  // Check if cross-section data size 
+   if (m_ntemp * m_nwave * branches.size() != m_crossSection.size()) {
+     throw CanteraError("PhotolysisBase::PhotolysisBase",
+                        "Cross-section data size does not match the temperature, "
+@@ -182,16 +188,19 @@ void PhotolysisBase::setParameters(AnyMap const& node, UnitStack const& rate_uni
+   } else if (rtmp.products != rtmp.reactants) { // this is not photoabsorption
+     m_branch.push_back(rtmp.products);
+   }
+-
++   
+   if (node.hasKey("cross-section")) {
+     for (auto const& data: node["cross-section"].asVector<AnyMap>()) {
+       auto format = data["format"].asString();
+       auto temp = data["temperature-range"].asVector<double>(2, 2);
++      
++      //Check temperature range to be monotonically increasing
+       if (temp[0] >= temp[1]) {
+         throw CanteraError("PhotolysisBase::setParameters",
+                            "Temperature range must be strictly increasing.");
+       }
+-
++      
++      //Check for gaps in temperature range
+       if (temperature.empty()) {
+         temperature = temp;
+       } else {
+@@ -209,9 +218,12 @@ void PhotolysisBase::setParameters(AnyMap const& node, UnitStack const& rate_uni
+           result.first.push_back(entry[0]);
+           result.second.push_back(entry[1]);
+         }
++      
++      //Read file names for VULCAN photochemistry database
+       } else if (format == "VULCAN") {
+         auto files = data["filenames"].asVector<string>();
+         result = load_xsection_vulcan(files, m_branch);
++      //Read file name for KINETICS photochemistry database
+       } else if (format == "KINETICS7") {
+         auto files = data["filenames"].asVector<string>();
+         result = load_xsection_kinetics7(files, m_branch);
+@@ -267,11 +279,13 @@ void PhotolysisBase::setParameters(AnyMap const& node, UnitStack const& rate_uni
+   m_valid = true;
+ }
+ 
++ //Set the rate parameters to flow style ?? (TBD)
+ void PhotolysisBase::getRateParameters(AnyMap& node) const
+ {
+   node.setFlowStyle();
+ }
+ 
++ //Get rate parameters for photolysis reaction
+ void PhotolysisBase::getParameters(AnyMap& node) const
+ {
+   AnyMap rateNode;
+@@ -282,6 +296,7 @@ void PhotolysisBase::getParameters(AnyMap& node) const
+   }
+ }
+ 
++//Check temperature range, and wavelength data for photolysis reactions
+ void PhotolysisBase::check(string const& equation)
+ {
+   if (m_ntemp < 2) {
+@@ -296,6 +311,7 @@ void PhotolysisBase::check(string const& equation)
+   }
+ }
+ 
++//Check rate coefficient 
+ void PhotolysisBase::validate(string const& equation, Kinetics const& kin)
+ {
+   if (!valid()) {
+@@ -330,6 +346,7 @@ void PhotolysisBase::validate(string const& equation, Kinetics const& kin)
+     }
+   }
+ 
++  // Check for consistency in species in reaction string, and photolysis branches
+   if (species_from_equation != species_from_branches) {
+     throw InputFileError("PhotolysisBase::validate", m_input,
+                        "Reaction '{}' has different products than the photolysis branches.", equation);
+@@ -353,6 +370,7 @@ vector<double> PhotolysisBase::getCrossSection(double temp, double wavelength) c
+   return cross;
+ }
+ 
++// Evaluate the photolysis rate, and update the stoichiometric coefficient for different branches
+ double PhotolysisRate::evalFromStruct(PhotolysisData const& data) {
+     double wmin = m_temp_wave_grid[m_ntemp];
+     double wmax = m_temp_wave_grid.back();
+@@ -382,10 +400,9 @@ double PhotolysisRate::evalFromStruct(PhotolysisData const& data) {
+ 
+     double coord[2] = {data.temperature, data.wavelength[0]};
+     size_t len[2] = {m_ntemp, m_nwave};
++ 
+ 
+-    // debug
+-    //std::cout << "coord = " << coord[0] << " " << coord[1] << std::endl;
+-
++    // N-space interpolation to determine photolysis cross section
+     interpn(cross1, coord, m_crossSection.data(), m_temp_wave_grid.data(),
+         len, 2, m_branch.size());
+ 
+@@ -417,6 +434,7 @@ double PhotolysisRate::evalFromStruct(PhotolysisData const& data) {
+ 
+       // photodissociation only
+       for (size_t n = 1; n < m_branch.size(); n++) {
++        //Photochemical rate constant
+         double rate = 0.5 * (data.wavelength[i+1] - data.wavelength[i])
+           * (cross1[n] * data.actinicFlux[i] + cross2[n] * data.actinicFlux[i+1]);
+ 
+diff --git a/src/kinetics/ReactionRateFactory.cpp b/src/kinetics/ReactionRateFactory.cpp
+index 605447768..41a19cbc8 100644
+--- a/src/kinetics/ReactionRateFactory.cpp
++++ b/src/kinetics/ReactionRateFactory.cpp
+@@ -85,6 +85,7 @@ ReactionRateFactory::ReactionRateFactory()
+     reg("custom-rate-function", [](const AnyMap& node, const UnitStack& rate_units) {
+         return new CustomFunc1Rate(node, rate_units);
+     });
++    addAlias("custom-rate-function", "custom");
+ 
+     // InterfaceArrheniusRate evaluator
+     reg("interface-Arrhenius", [](const AnyMap& node, const UnitStack& rate_units) {
+diff --git a/src/kinetics/TwoTempPlasmaRate.cpp b/src/kinetics/TwoTempPlasmaRate.cpp
+index ce3f46949..1a930ada5 100644
+--- a/src/kinetics/TwoTempPlasmaRate.cpp
++++ b/src/kinetics/TwoTempPlasmaRate.cpp
+@@ -51,8 +51,8 @@ TwoTempPlasmaRate::TwoTempPlasmaRate()
+     m_E4_str = "Ea-electron";
+ }
+ 
+-TwoTempPlasmaRate::TwoTempPlasmaRate(double A, double b, double Ea, double EE)
+-    : ArrheniusBase(A, b, Ea)
++TwoTempPlasmaRate::TwoTempPlasmaRate(double A, double b, double T0, double Ea, double EE)
++    : ArrheniusBase(A, b, T0, Ea)
+ {
+     m_Ea_str = "Ea-gas";
+     m_E4_str = "Ea-electron";
