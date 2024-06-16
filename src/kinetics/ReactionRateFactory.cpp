@@ -18,6 +18,7 @@
 #include "cantera/kinetics/PlogRate.h"
 #include "cantera/kinetics/TwoTempPlasmaRate.h"
 #include "cantera/kinetics/Photolysis.h"
+#include "cantera/kinetics/Condensation.h"
 
 namespace Cantera
 {
@@ -85,7 +86,6 @@ ReactionRateFactory::ReactionRateFactory()
     reg("custom-rate-function", [](const AnyMap& node, const UnitStack& rate_units) {
         return new CustomFunc1Rate(node, rate_units);
     });
-    addAlias("custom-rate-function", "custom");
 
     // InterfaceArrheniusRate evaluator
     reg("interface-Arrhenius", [](const AnyMap& node, const UnitStack& rate_units) {
@@ -111,6 +111,12 @@ ReactionRateFactory::ReactionRateFactory()
     reg("photolysis", [](const AnyMap& node, const UnitStack& rate_units) {
         return new PhotolysisRate(node, rate_units);
     });
+
+    // Condensation evaluator
+    reg("condensation", [](const AnyMap& node, const UnitStack& rate_units) {
+        return new Condensation(node, rate_units);
+    });
+    addAlias("condensation", "interface-condensation");
 }
 
 ReactionRateFactory* ReactionRateFactory::factory() {
