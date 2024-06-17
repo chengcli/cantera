@@ -9,6 +9,7 @@
 #include "cantera/kinetics/BulkKinetics.h"
 #include "cantera/kinetics/InterfaceKinetics.h"
 #include "cantera/kinetics/EdgeKinetics.h"
+#include "cantera/kinetics/Nucleation.h"
 #include "cantera/kinetics/Reaction.h"
 #include "cantera/thermo/ThermoPhase.h"
 #include "cantera/base/stringUtils.h"
@@ -35,6 +36,7 @@ KineticsFactory::KineticsFactory() {
     addDeprecatedAlias("surface", "surf");
     reg("edge", []() { return new EdgeKinetics(); });
     addDeprecatedAlias("edge", "Edge");
+    reg("nucleation", []() { return new Nucleation(); });
 }
 
 KineticsFactory* KineticsFactory::factory() {
