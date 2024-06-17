@@ -27,8 +27,7 @@ class Condensation : public ReactionRate {
   //! Set the rate parameters for this reaction.
   void setRateParameters(const AnyValue& equation,
                          const AnyValue& rate,
-                         const UnitSystem& units,
-                         const UnitStack& rate_units);
+                         const AnyMap& node);
 
   //! return the rate coefficient type
   const string type() const override { return "condensation"; }
@@ -48,7 +47,13 @@ class Condensation : public ReactionRate {
   double m_beta = 0.0;
   double m_delta = 0.0;
   string m_svp_str = "formula";
+
+  double m_min_temp = 0.0;
+  double m_max_temp = 1.0e30;
 };
+
+std::function<double(double)> find_svp_function(const Composition& reactants, 
+                                                const string& svp_name);
 
 }
 
