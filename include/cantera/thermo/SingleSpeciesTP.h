@@ -215,7 +215,7 @@ public:
     //! @{
 
     //! Mass fractions are fixed, with Y[0] = 1.0.
-    void setMassFractions(const double* const y) override {};
+    void setMassFractions(const double* const y, size_t stride = 1) override {};
 
     //! Mole fractions are fixed, with x[0] = 1.0.
     void setMoleFractions(const double* const x) override {};

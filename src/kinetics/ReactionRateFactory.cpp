@@ -18,7 +18,7 @@
 #include "cantera/kinetics/PlogRate.h"
 #include "cantera/kinetics/TwoTempPlasmaRate.h"
 #include "cantera/kinetics/Photolysis.h"
-#include "cantera/kinetics/Condensation.h"
+#include "cantera/kinetics/Nucleation.h"
 
 namespace Cantera
 {
@@ -113,10 +113,10 @@ ReactionRateFactory::ReactionRateFactory()
     });
 
     // Condensation evaluator
-    reg("condensation", [](const AnyMap& node, const UnitStack& rate_units) {
-        return new Condensation(node, rate_units);
+    reg("nucleation", [](const AnyMap& node, const UnitStack& rate_units) {
+        return new NucleationRate(node, rate_units);
     });
-    addAlias("condensation", "interface-condensation");
+    addAlias("nucleation", "interface-nucleation");
 }
 
 ReactionRateFactory* ReactionRateFactory::factory() {

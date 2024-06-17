@@ -1,59 +1,57 @@
 #ifndef CT_CONDENSATION_H
 #define CT_CONDENSATION_H
 
-#include <functional>
-
-#include "cantera/base/ct_defs.h"
-#include "cantera/base/Units.h"
-#include "cantera/kinetics/Arrhenius.h"
-#include "ReactionRate.h"
-#include "MultiRate.h"
+#include "Kinetics.h"
 
 namespace Cantera
 {
 
-class AnyValue;
-class AnyMap;
-
-class Condensation : public ReactionRate {
+class Condensation : public Kinetics {
  public:
   Condensation() = default;
-  Condensation(const AnyMap& node, const UnitStack& rate_units);
 
-  unique_ptr<MultiRateBase> newMultiRate() const override {
-    return make_unique<MultiRate<Condensation, ArrheniusData>>();
+  ~Condensation() override {}
+
+  void resizeReactions() override;
+
+  string kineticsType() const override {
+    return "nucleation";
   }
 
-  //! Set the rate parameters for this reaction.
-  void setRateParameters(const AnyValue& equation,
-                         const AnyValue& rate,
-                         const AnyMap& node);
+  void getActivityConcentrations(double* const conc) override;
 
-  //! return the rate coefficient type
-  const string type() const override { return "condensation"; }
+  bool isReversible(size_t i) override {
+    return true;
+  }
 
-  void getParameters(AnyMap& rateNode, const Units& rate_units=Units(0.)) const;
-  using ReactionRate::getParameters;
+  void getFwdRateConstants(double* kfwd) override;
 
-  void validate(const string& equation, const Kinetics& kin) override;
+  void resizeSpecies() override;
 
-  double evalFromStruct(const ArrheniusData& shared_data) const;
+  bool addReaction(shared_ptr<Reaction> r, bool resize=true) override;
+
+  void updateROP() override;
+
+  void _update_rates_T();
+
+  void _update_rates_C();
 
  protected:
-  std::function<double(double)> m_svpfunc;
+  vector<double> m_actConc;
 
-  double m_t3 = 0.0;
-  double m_p3 = 0.0;
-  double m_beta = 0.0;
-  double m_delta = 0.0;
-  string m_svp_str = "formula";
+  //! Number of dimensions of reacting phase (2 for InterfaceKinetics, 1 for
+  //! EdgeKinetics)
+  size_t m_nDim = 2;
 
-  double m_min_temp = 0.0;
-  double m_max_temp = 1.0e30;
+  //! Vector of rate handlers for interface reactions
+  vector<unique_ptr<MultiRateBase>> m_interfaceRates;
+  map<string, size_t> m_interfaceTypes; //!< Rate handler mapping
+
+  bool m_ROP_ok = false;
+
+  //! Current temperature of the data
+  double m_temp = 0.0;
 };
-
-std::function<double(double)> find_svp_function(const Composition& reactants, 
-                                                const string& svp_name);
 
 }
 

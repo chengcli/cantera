@@ -292,11 +292,11 @@ public:
      */
     void getMoleFractions(double* const x) const;
 
-    void setMassFractions(const double* const y) override {
+    void setMassFractions(const double* const y, size_t stride = 1) override {
         throw NotImplementedError("LatticeSolidPhase::setMassFractions");
     }
 
-    void setMassFractions_NoNorm(const double* const y) override {
+    void setMassFractions_NoNorm(const double* const y, size_t stride = 1) override {
         throw NotImplementedError("LatticeSolidPhase::setMassFractions_NoNorm");
     }
 

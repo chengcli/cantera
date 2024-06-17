@@ -1,119 +1,136 @@
-#include "cantera/numerics/Func1.h"
-#include "cantera/base/stringUtils.h"
-#include "cantera/kinetics/Condensation.h"
-#include "cantera/kinetics/svp_funcs.h"
 #include "cantera/kinetics/Reaction.h"
+#include "cantera/kinetics/Condensation.h"
+#include "cantera/thermo/ThermoPhase.h"
 
 namespace Cantera
 {
 
-string concatenate(const Composition& comp, char sep) {
-  if (comp.empty()) return "";
-  if (comp.size() == 1) return comp.begin()->first;
-  
-  std::string result = comp.begin()->first;
-
-  for (auto it = std::next(comp.begin()); it != comp.end(); ++it) {
-    result += sep + it->first;
-  }
-
-  return result;
-}
-
-std::function<double(double)> find_svp_function(const Composition& reactants,
-                                                const string& svp_name) 
+void Condensation::resizeReactions()
 {
-  string name = concatenate(reactants, '-') + '-' + svp_name;
+  Kinetics::resizeReactions();
 
-  if (name == "NH3-H2S-lewis" || name == "H2S-NH3-lewis") {
-    return svp_nh3_h2s_Lewis;
-  } else if (name == "H2O-antoine") {
-    return svp_h2o_Antoine;
-  } else if (name == "NH3-antoine") {
-    return svp_nh3_Antoine;
+  for (auto& rates : m_interfaceRates) {
+    rates->resize(nTotalSpecies(), nReactions(), nPhases());
   }
-
-  throw CanteraError("find_svp_function",
-                     "No SVP function found for reaction '{}'.", name);
 }
 
-Condensation::Condensation(const AnyMap& node, const UnitStack& rate_units)
-    : Condensation()
+void Condensation::getActivityConcentrations(double* const conc)
 {
-  setParameters(node, rate_units);
-
-  if (!node.hasKey("rate-constant")) {
-    throw CanteraError("Condensation::Condensation",
-                       "Missing 'rate-constant' key in rate node.");
-  }
-
-  setRateParameters(node["equation"], node["rate-constant"], node);
+  _update_rates_C();
+  copy(m_actConc.begin(), m_actConc.end(), conc);
 }
 
-void Condensation::setRateParameters(
-    const AnyValue& equation,
-    const AnyValue& rate,
-    const AnyMap& node)
+void Condensation::getFwdRateConstants(double* kfwd)
 {
-  if (rate.empty()) {
-    throw InputFileError("Condensation::setRateParameters", rate,
-                         "Missing rate constant data.");
-  }
-
-  if (!rate.is<AnyMap>()) {
-    throw InputFileError("Condensation::setRateParameters", rate,
-                         "Expected a parameter map.");
-  }
-
-  auto& rate_map = rate.as<AnyMap>();
-  string svp_name = rate_map[m_svp_str].asString();
-
-  if (rate.hasKey("minT")) {
-    m_min_temp = rate_map["minT"].asDouble();
-  };
-
-  if (rate.hasKey("maxT")) {
-    m_max_temp = rate_map["maxT"].asDouble();
-  };
-
-  if (svp_name == "ideal") {
-    m_t3 = rate_map["T3"].asDouble();
-    m_p3 = rate_map["P3"].asDouble();
-    m_beta = rate_map["beta"].asDouble();
-    m_delta = rate_map["delta"].asDouble();
-    m_svpfunc = [this](double T) {
-      return m_p3 * exp((1. - m_t3 / T) * m_beta - m_delta * log(T / m_t3));
-    };
-  } else {
-    Reaction rtmp;
-    parseReactionEquation(rtmp, equation.asString(), node, nullptr);
-    m_svpfunc = find_svp_function(rtmp.reactants, svp_name);
-  }
-
-  m_valid = true;
+  updateROP();
+  copy(m_rfn.begin(), m_rfn.end(), kfwd);
 }
 
-void Condensation::validate(const string& equation, const Kinetics& kin)
+void Condensation::resizeSpecies()
 {
-  if (!m_valid) {
-    throw InputFileError("Condensation::validate", m_input,
-            "Rate object for reaction '{}' is not configured.", equation);
+  size_t kOld = m_kk;
+  Kinetics::resizeSpecies();
+  if (m_kk != kOld && nReactions()) {
+      throw CanteraError("InterfaceKinetics::resizeSpecies", "Cannot add"
+          " species to InterfaceKinetics after reactions have been added.");
+  }
+
+  m_actConc.resize(m_kk);
+}
+
+bool Condensation::addReaction(shared_ptr<Reaction> r_base, bool resize)
+{
+  size_t i = nReactions();
+  bool added = Kinetics::addReaction(r_base, resize);
+  if (!added) {
+      return false;
+  }
+
+  // Set index of rate to number of reaction within kinetics
+  shared_ptr<ReactionRate> rate = r_base->rate();
+  rate->setRateIndex(nReactions() - 1);
+  rate->setContext(*r_base, *this);
+
+  string rtype = rate->subType();
+  if (rtype == "") {
+      rtype = rate->type();
+  }
+
+  // If necessary, add new interface MultiRate evaluator
+  if (m_interfaceTypes.find(rtype) == m_interfaceTypes.end()) {
+    m_interfaceTypes[rtype] = m_interfaceRates.size();
+    m_interfaceRates.push_back(rate->newMultiRate());
+    m_interfaceRates.back()->resize(m_kk, nReactions(), nPhases());
+  }
+
+  // Add reaction rate to evaluator
+  size_t index = m_interfaceTypes[rtype];
+  m_interfaceRates[index]->add(nReactions() - 1, *rate);
+
+  return true;
+}
+
+void Condensation::updateROP() {
+  // evaluate rate constants and equilibrium constants at temperature and phi
+  // (electric potential)
+  _update_rates_T();
+  // get updated activities (rates updated below)
+  _update_rates_C();
+
+  if (m_ROP_ok) {
+    return;
+  }
+
+  std::fill(m_ropf.begin(), m_ropf.end(), 1.0);
+
+  // multiply ropf by the activity concentration reaction orders to obtain
+  // the forward rates of progress.
+  m_reactantStoich.multiply(m_actConc.data(), m_ropf.data());
+
+  // products
+  m_revProductStoich.multiply(m_actConc.data(), m_ropr.data());
+
+  for (size_t j = 0; j != nReactions(); ++j) {
+    m_ropnet[j] = m_ropf[j];
+    m_ropr[j] = 0.;
   }
 }
 
-double Condensation::evalFromStruct(const ArrheniusData& shared_data) const
+void Condensation::_update_rates_T()
 {
-  if (shared_data.temperature < m_min_temp || shared_data.temperature > m_max_temp) {
-    return -1;
+  // Go find the temperature from the surface
+  double T = thermo(0).temperature();
+
+  if (T != m_temp) {
+    m_temp = T;
+    m_ROP_ok = false;
   }
 
-  return m_svpfunc(shared_data.temperature);
+  // loop over interface MultiRate evaluators for each reaction type
+  for (auto& rates : m_interfaceRates) {
+    bool changed = rates->update(thermo(0), *this);
+    if (changed) {
+      rates->getRateConstants(m_rfn.data());
+      m_ROP_ok = false;
+    }
+  }
 }
 
-void Condensation::getParameters(AnyMap& rateNode, const Units& rate_units) const
+void Condensation::_update_rates_C()
 {
-  throw NotImplementedError("Condensation::getParameters",
-                            "Not implemented by '{}' object.", type());
+  for (size_t n = 0; n < nPhases(); n++) {
+    const auto& tp = thermo(n);
+    /*
+     * We call the getActivityConcentrations function of each ThermoPhase
+     * class that makes up this kinetics object to obtain the generalized
+     * concentrations for species within that class. This is collected in
+     * the vector m_conc. m_start[] are integer indices for that vector
+     * denoting the start of the species for each phase.
+     */
+    tp.getActivityConcentrations(m_actConc.data() + m_start[n]);
+  }
+  m_ROP_ok = false;
 }
+
 
 }

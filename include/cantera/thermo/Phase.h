@@ -448,14 +448,18 @@ public:
     //!                  must be greater than or equal to the number of
     //!                  species. The Phase object will normalize this vector
     //!                  before storing its contents.
-    virtual void setMassFractions(const double* const y);
+    virtual void setMassFractions(const double* const y, size_t stride = 1);
 
     //! Set the mass fractions to the specified values without normalizing.
     //! This is useful when the normalization condition is being handled by
     //! some other means, for example by a constraint equation as part of a
     //! larger set of equations.
     //!     @param y  Input vector of mass fractions. Length is m_kk.
-    virtual void setMassFractions_NoNorm(const double* const y);
+    virtual void setMassFractions_NoNorm(const double* const y, size_t stride = 1);
+
+
+    //! Set the mass fractions to the specified values without normalizing.
+    virtual void setMassFractionsPartial(const double* const y, size_t stride = 1);
 
     //! Get the species concentrations (kmol/m^3).
     /*!
