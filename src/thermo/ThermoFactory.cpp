@@ -15,6 +15,7 @@
 #include "cantera/thermo/PDSSFactory.h"
 #include "cantera/thermo/MultiSpeciesThermo.h"
 #include "cantera/thermo/IdealGasPhase.h"
+#include "cantera/thermo/IdealMistPhase.h"
 #include "cantera/thermo/PlasmaPhase.h"
 
 #include "cantera/thermo/IdealSolidSolnPhase.h"
@@ -53,6 +54,7 @@ ThermoFactory::ThermoFactory()
     addDeprecatedAlias("none", "None");
     reg("ideal-gas", []() { return new IdealGasPhase(); });
     addDeprecatedAlias("ideal-gas", "IdealGas");
+    reg("ideal-mist", []() { return new IdealMistPhase(); });
     reg("plasma", []() { return new PlasmaPhase(); });
     reg("ideal-surface", []() { return new SurfPhase(); });
     addDeprecatedAlias("ideal-surface", "Surface");

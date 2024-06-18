@@ -106,9 +106,17 @@ void Condensation::updateROP() {
 
   std::fill(m_ropf.begin(), m_ropf.end(), 1.0);
 
+  for (size_t i = 0; i < m_actConc.size(); i++) {
+    std::cout << "actConc[" << i << "] = " << m_actConc[i] << std::endl;
+  }
+
   // multiply ropf by the activity concentration reaction orders to obtain
   // the forward rates of progress.
   m_reactantStoich.multiply(m_actConc.data(), m_ropf.data());
+
+  for (size_t j = 0; j != nReactions(); ++j) {
+    std::cout << "ropf[" << j << "] = " << m_ropf[j] << std::endl;
+  }
 
   // m_rfn -> saturation activity concentration
   // m_ropf -> current activity concentration
@@ -163,7 +171,10 @@ void Condensation::_update_rates_T()
 
 void Condensation::_update_rates_C()
 {
-  for (size_t n = 0; n < nPhases(); n++) {
+  // dry air has activity concentration of 0.0
+  m_actConc[0] = 0.0;
+
+  for (size_t n = 1; n < nPhases(); n++) {
     const auto& tp = thermo(n);
     /*
      * We call the getActivityConcentrations function of each ThermoPhase
