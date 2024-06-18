@@ -88,6 +88,7 @@ void NucleationRate::setRateParameters(
     Reaction rtmp;
     parseReactionEquation(rtmp, equation.asString(), node, nullptr);
     m_svpfunc = find_svp_function(rtmp.reactants, svp_name);
+    m_order = rtmp.reactants.size();
   }
 
   m_valid = true;
@@ -107,7 +108,9 @@ double NucleationRate::evalFromStruct(const ArrheniusData& shared_data) const
     return -1;
   }
 
-  return m_svpfunc(shared_data.temperature);
+  double RT = GasConstant * shared_data.temperature;
+
+  return m_svpfunc(shared_data.temperature) / pow(RT, m_order);
 }
 
 void NucleationRate::getParameters(AnyMap& rateNode, const Units& rate_units) const

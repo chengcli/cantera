@@ -42,6 +42,8 @@ class NucleationRate : public ReactionRate {
  protected:
   std::function<double(double)> m_svpfunc;
 
+  size_t m_order = 1;
+
   double m_t3 = 0.0;
   double m_p3 = 0.0;
   double m_beta = 0.0;

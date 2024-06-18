@@ -5,6 +5,21 @@
 namespace Cantera
 {
 
+inline double saturation_function(double act, double acts, double prod, size_t order)
+{
+  if (act < acts) {
+    return -prod;
+  }
+
+  if (order == 1) {
+    return act - acts;
+  } else if (order == 2) {
+    return act - acts;
+  }
+
+  return 0.;
+}
+
 void Condensation::resizeReactions()
 {
   Kinetics::resizeReactions();
@@ -12,6 +27,7 @@ void Condensation::resizeReactions()
   for (auto& rates : m_interfaceRates) {
     rates->resize(nTotalSpecies(), nReactions(), nPhases());
   }
+  m_satf.resize(nReactions());
 }
 
 void Condensation::getActivityConcentrations(double* const conc)
@@ -87,12 +103,26 @@ void Condensation::updateROP() {
   // the forward rates of progress.
   m_reactantStoich.multiply(m_actConc.data(), m_ropf.data());
 
-  // products
-  m_revProductStoich.multiply(m_actConc.data(), m_ropr.data());
+  // m_rfn -> saturation activity concentration
+  // m_ropf -> current activity concentration
+
+  for (int j = 0; j < nReactions(); j++) {
+    // inactive reactions
+    if (m_rfn[j] < 0.0) {
+      m_satf[j] = 0.0;
+      continue;
+    }
+
+    // calculate saturation function
+    size_t iprod = kineticsSpeciesIndex(m_reactions[j]->products.begin()->first);
+    m_satf[j] = saturation_function(m_ropf[j], m_rfn[j], 
+                                    m_actConc[iprod], m_reactions[j]->reactants.size());
+  }
 
   for (size_t j = 0; j != nReactions(); ++j) {
-    m_ropnet[j] = m_ropf[j];
-    m_ropr[j] = 0.;
+    m_ropf[j] = std::max(0., m_satf[j]);
+    m_ropr[j] = std::max(0., -m_satf[j]);
+    m_ropnet[j] = m_ropf[j] - m_ropr[j];
   }
 }
 

@@ -38,6 +38,7 @@ class Condensation : public Kinetics {
 
  protected:
   vector<double> m_actConc;
+  vector<double> m_satf;
 
   //! Number of dimensions of reacting phase (2 for InterfaceKinetics, 1 for
   //! EdgeKinetics)
