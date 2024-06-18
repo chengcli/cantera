@@ -1,3 +1,7 @@
+// C/C++
+#include <numeric>
+#include <algorithm>
+
 #include "cantera/kinetics/Reaction.h"
 #include "cantera/kinetics/Condensation.h"
 #include "cantera/thermo/ThermoPhase.h"
@@ -5,16 +9,19 @@
 namespace Cantera
 {
 
-inline double saturation_function(double act, double acts, double prod, size_t order)
+// This works for these two types of reactions:
+// (1) A -> B (order 1)
+// (2) A + B -> C (order 2)
+inline double saturation_function(double delta, double react, double prod, size_t order)
 {
-  if (act < acts) {
-    return -prod;
+  if (delta < 0) {
+    return -std::min(prod, -delta);
   }
 
   if (order == 1) {
-    return act - acts;
+    return delta;
   } else if (order == 2) {
-    return act - acts;
+    return (react - sqrt(react * react - 4 * delta)) / 2.;
   }
 
   return 0.;
@@ -114,9 +121,17 @@ void Condensation::updateROP() {
     }
 
     // calculate saturation function
-    size_t iprod = kineticsSpeciesIndex(m_reactions[j]->products.begin()->first);
-    m_satf[j] = saturation_function(m_ropf[j], m_rfn[j], 
-                                    m_actConc[iprod], m_reactions[j]->reactants.size());
+    auto& R = m_reactions[j];
+    double react = std::accumulate(R->reactants.begin(), R->reactants.end(), 0.0,
+                    [&](double sum, const std::pair<std::string, double>& r) {
+                      return sum + m_actConc[kineticsSpeciesIndex(r.first)] / r.second;
+                    });
+    double prod = std::accumulate(R->products.begin(), R->products.end(), 
+                    std::numeric_limits<double>::infinity(),
+                    [&](double min, const std::pair<std::string, double>& p) {
+                      return std::min(min, m_actConc[kineticsSpeciesIndex(p.first)] / p.second);
+                    });
+    m_satf[j] = saturation_function(m_ropf[j] - m_rfn[j], react, prod, R->reactants.size());
   }
 
   for (size_t j = 0; j != nReactions(); ++j) {
