@@ -36,7 +36,18 @@ class Condensation : public Kinetics {
 
   void _update_rates_C();
 
+  Eigen::SparseMatrix<double> netRatesOfProgress_ddCi() override;
+
  protected:
+  //! Process derivatives
+  //! @param stoich  stoichiometry manager
+  //! @param in  rate expression used for the derivative calculation
+  //! @param ddX true: w.r.t mole fractions false: w.r.t species concentrations
+  //! @return a sparse matrix of derivative contributions for each reaction of
+  //! dimensions nTotalReactions by nTotalSpecies
+  Eigen::SparseMatrix<double> calculateCompositionDerivatives(
+      StoichManagerN& stoich, const vector<double>& in, bool ddX=true);
+
   vector<double> m_actConc;
   vector<double> m_satf;
 
@@ -52,6 +63,10 @@ class Condensation : public Kinetics {
 
   //! Current temperature of the data
   double m_temp = 0.0;
+
+  //! Buffers for partial rop results with length nReactions()
+  vector<double> m_rbuf0;
+  vector<double> m_rbuf1;
 };
 
 }

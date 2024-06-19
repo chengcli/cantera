@@ -9,27 +9,29 @@
 namespace Cantera
 {
 
-// This works for these two types of reactions:
-// (1) A -> B (order 1)
-// (2) A + B -> C (order 2)
-inline double saturation_function(double delta, double react, double prod, size_t order)
+// Only works for A -> B (order 1)
+inline double saturation_function1(double ss, double react, double prod)
 {
-  if (delta < 0) {
-    return -std::min(prod, -delta);
+  if (ss < 0) {
+    return -std::min(prod, -ss);
   }
+  return ss;
+}
 
-  if (order == 1) {
-    return delta;
-  } else if (order == 2) {
-    return (react - sqrt(react * react - 4 * delta)) / 2.;
+// Only works for A + B -> C (order 2)
+inline double saturation_function2(double ss, double react, double prod)
+{
+  if (ss < 0.) {
+    return -std::min(prod, (- react + sqrt(react * react - 4 * ss)) / 2.);
   }
-
-  return 0.;
+  return (react - sqrt(react * react - 4 * ss)) / 2.;
 }
 
 void Condensation::resizeReactions()
 {
   Kinetics::resizeReactions();
+  m_rbuf0.resize(nReactions());
+  m_rbuf1.resize(nReactions());
 
   for (auto& rates : m_interfaceRates) {
     rates->resize(nTotalSpecies(), nReactions(), nPhases());
@@ -94,11 +96,8 @@ bool Condensation::addReaction(shared_ptr<Reaction> r_base, bool resize)
 }
 
 void Condensation::updateROP() {
-  // evaluate rate constants and equilibrium constants at temperature and phi
-  // (electric potential)
-  _update_rates_T();
-  // get updated activities (rates updated below)
-  _update_rates_C();
+  auto jac = netRatesOfProgress_ddCi();
+  auto A = jac * m_stoichMatrix;
 
   if (m_ROP_ok) {
     return;
@@ -129,17 +128,23 @@ void Condensation::updateROP() {
     }
 
     // calculate saturation function
+    double ss = m_ropf[j] - m_rfn[j];
+    size_t order = m_reactions[j]->reactants.size();
     auto& R = m_reactions[j];
-    double react = std::accumulate(R->reactants.begin(), R->reactants.end(), 0.0,
-                    [&](double sum, const std::pair<std::string, double>& r) {
-                      return sum + m_actConc[kineticsSpeciesIndex(r.first)] / r.second;
-                    });
-    double prod = std::accumulate(R->products.begin(), R->products.end(), 
-                    std::numeric_limits<double>::infinity(),
-                    [&](double min, const std::pair<std::string, double>& p) {
-                      return std::min(min, m_actConc[kineticsSpeciesIndex(p.first)] / p.second);
-                    });
-    m_satf[j] = saturation_function(m_ropf[j] - m_rfn[j], react, prod, R->reactants.size());
+
+    if (order == 1) { // order 1
+      size_t iy = kineticsSpeciesIndex(R->products.begin()->first);
+      double y = m_actConc[iy];
+      m_satf[j] = saturation_function1(ss, 0. /* dummy */, y);
+    } else { // order 2
+      size_t ix1 = kineticsSpeciesIndex(R->reactants.begin()->first);
+      size_t ix2 = kineticsSpeciesIndex(next(R->reactants.begin())->first);
+      size_t iy = kineticsSpeciesIndex(next(R->products.begin())->first);
+      double x1 = m_actConc[ix1];
+      double x2 = m_actConc[ix2];
+      double y = m_actConc[iy];
+      m_satf[j] = saturation_function2(ss, x1 + x2, y);
+    }
   }
 
   for (size_t j = 0; j != nReactions(); ++j) {
@@ -188,5 +193,57 @@ void Condensation::_update_rates_C()
   m_ROP_ok = false;
 }
 
+Eigen::SparseMatrix<double> Condensation::netRatesOfProgress_ddCi()
+{
+  // set rate constants, m_rfn
+  _update_rates_T();
+
+  // set activity concentrations, m_actConc
+  _update_rates_C();
+
+  // forward reaction rate coefficients
+  Eigen::SparseMatrix<double> jac(nReactions(), nTotalSpecies());
+
+  std::fill(m_rbuf0.begin(), m_rbuf0.end(), 1.0);
+  m_reactantStoich.multiply(m_actConc.data(), m_rbuf0.data());
+
+  for (size_t j = 0; j < nReactions(); ++j) {
+    double ss = m_rbuf0[j] - m_rfn[j];
+    size_t order = m_reactions[j]->reactants.size();
+    auto& R = m_reactions[j];
+
+    if (order == 1) {
+      size_t ix = kineticsSpeciesIndex(R->reactants.begin()->first);
+      size_t iy = kineticsSpeciesIndex(R->products.begin()->first);
+      double y = m_actConc[iy];
+
+      if (ss > 0.) {
+        jac.coeffRef(j, ix) = 1.;
+      } else if (y < - ss) {
+        jac.coeffRef(j, ix) = -1.;
+      } else {
+        jac.coeffRef(j, iy) = -1.;
+      }
+    } else { // order 2
+      size_t ix1 = kineticsSpeciesIndex(R->reactants.begin()->first);
+      size_t ix2 = kineticsSpeciesIndex(next(R->reactants.begin())->first);
+      size_t iy = kineticsSpeciesIndex(R->products.begin()->first);
+
+      double x1 = m_actConc[ix1];
+      double x2 = m_actConc[ix2];
+      double y = m_actConc[iy];
+      double react = x1 + x2;
+      double delta = - react + sqrt(react * react - 4 * ss) / 2.;
+      if (ss > 0. || (ss < 0. && y > delta)) {
+        jac.coeffRef(j, ix1) = (1. - (x1 - x2) / sqrt(react * react - 4 * ss)) / 2.;
+        jac.coeffRef(j, ix2) = (1. - (x2 - x1) / sqrt(react * react - 4 * ss)) / 2.;
+      } else {  // y < delta
+        jac.coeffRef(j, iy) = -1.;
+      }
+    }
+  }
+
+  return jac;
+}
 
 }
