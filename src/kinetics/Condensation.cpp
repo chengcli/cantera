@@ -97,13 +97,12 @@ bool Condensation::addReaction(shared_ptr<Reaction> r_base, bool resize)
 
 void Condensation::updateROP() {
   auto jac = netRatesOfProgress_ddCi();
-  auto A = jac * m_stoichMatrix;
 
   if (m_ROP_ok) {
     return;
   }
 
-  std::fill(m_ropf.begin(), m_ropf.end(), 1.0);
+  std::fill(m_rbuf0.begin(), m_rbuf0.end(), 1.0);
 
   for (size_t i = 0; i < m_actConc.size(); i++) {
     std::cout << "actConc[" << i << "] = " << m_actConc[i] << std::endl;
@@ -111,47 +110,73 @@ void Condensation::updateROP() {
 
   // multiply ropf by the activity concentration reaction orders to obtain
   // the forward rates of progress.
-  m_reactantStoich.multiply(m_actConc.data(), m_ropf.data());
+  m_reactantStoich.multiply(m_actConc.data(), m_rbuf0.data());
 
   for (size_t j = 0; j != nReactions(); ++j) {
-    std::cout << "ropf[" << j << "] = " << m_ropf[j] << std::endl;
+    std::cout << "rbuf[" << j << "] = " << m_rbuf0[j] << std::endl;
   }
 
-  // m_rfn -> saturation activity concentration
-  // m_ropf -> current activity concentration
+  // m_rfn -> saturation activity 
+  // m_rbuf -> current activity 
+
+  Eigen::VectorXd b(nReactions());
 
   for (int j = 0; j < nReactions(); j++) {
     // inactive reactions
     if (m_rfn[j] < 0.0) {
-      m_satf[j] = 0.0;
+      b(j) = 0.0;
       continue;
     }
 
     // calculate saturation function
-    double ss = m_ropf[j] - m_rfn[j];
+    double ss = m_rbuf0[j] - m_rfn[j];
     size_t order = m_reactions[j]->reactants.size();
     auto& R = m_reactions[j];
 
     if (order == 1) { // order 1
       size_t iy = kineticsSpeciesIndex(R->products.begin()->first);
       double y = m_actConc[iy];
-      m_satf[j] = saturation_function1(ss, 0. /* dummy */, y);
+      b(j) = saturation_function1(ss, 0. /* dummy */, y);
     } else { // order 2
       size_t ix1 = kineticsSpeciesIndex(R->reactants.begin()->first);
       size_t ix2 = kineticsSpeciesIndex(next(R->reactants.begin())->first);
-      size_t iy = kineticsSpeciesIndex(next(R->products.begin())->first);
+      size_t iy = kineticsSpeciesIndex(R->products.begin()->first);
       double x1 = m_actConc[ix1];
       double x2 = m_actConc[ix2];
       double y = m_actConc[iy];
-      m_satf[j] = saturation_function2(ss, x1 + x2, y);
+      std::cout << "ss = " << ss << std::endl;
+      std::cout << "x1 = " << x1 << std::endl;
+      std::cout << "x2 = " << x2 << std::endl;
+      std::cout << "y = " << y << std::endl;
+      b(j) = saturation_function2(ss, x1 + x2, y);
     }
   }
 
+  auto A = jac * m_stoichMatrix;
+
+  Eigen::SparseQR<Eigen::SparseMatrix<double>, Eigen::COLAMDOrdering<int>> solver;
+  solver.compute(A);
+  Eigen::VectorXd r = solver.solve(b);
+
+  if (solver.info() != Eigen::Success) {
+    throw CanteraError("Condensation::updateROP",
+                       "Failed to solve for net rates of progress.");
+  }
+
+  std::cout << jac << std::endl;
+  std::cout << "r = " << -r << std::endl;
+  std::cout << "S.r = " << -m_stoichMatrix * r << std::endl;
+  std::cout << "b = " << b << std::endl;
+
   for (size_t j = 0; j != nReactions(); ++j) {
-    m_ropf[j] = std::max(0., m_satf[j]);
-    m_ropr[j] = std::max(0., -m_satf[j]);
+    m_ropf[j] = std::max(0., -r(j));
+    //m_ropf[j] = std::max(0., b(j));
+    m_ropr[j] = std::max(0., r(j));
+    //m_ropr[j] = std::max(0., -b(j));
     m_ropnet[j] = m_ropf[j] - m_ropr[j];
   }
+
+  m_ROP_ok = true;
 }
 
 void Condensation::_update_rates_T()
