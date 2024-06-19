@@ -104,17 +104,17 @@ void Condensation::updateROP() {
 
   std::fill(m_rbuf0.begin(), m_rbuf0.end(), 1.0);
 
-  for (size_t i = 0; i < m_actConc.size(); i++) {
+  /*for (size_t i = 0; i < m_actConc.size(); i++) {
     std::cout << "actConc[" << i << "] = " << m_actConc[i] << std::endl;
-  }
+  }*/
 
   // multiply ropf by the activity concentration reaction orders to obtain
   // the forward rates of progress.
   m_reactantStoich.multiply(m_actConc.data(), m_rbuf0.data());
 
-  for (size_t j = 0; j != nReactions(); ++j) {
+  /*for (size_t j = 0; j != nReactions(); ++j) {
     std::cout << "rbuf[" << j << "] = " << m_rbuf0[j] << std::endl;
-  }
+  }*/
 
   // m_rfn -> saturation activity 
   // m_rbuf -> current activity 
@@ -144,10 +144,6 @@ void Condensation::updateROP() {
       double x1 = m_actConc[ix1];
       double x2 = m_actConc[ix2];
       double y = m_actConc[iy];
-      std::cout << "ss = " << ss << std::endl;
-      std::cout << "x1 = " << x1 << std::endl;
-      std::cout << "x2 = " << x2 << std::endl;
-      std::cout << "y = " << y << std::endl;
       b(j) = saturation_function2(ss, x1 + x2, y);
     }
   }
@@ -163,10 +159,10 @@ void Condensation::updateROP() {
                        "Failed to solve for net rates of progress.");
   }
 
-  std::cout << jac << std::endl;
+  /*std::cout << jac << std::endl;
   std::cout << "r = " << -r << std::endl;
   std::cout << "S.r = " << -m_stoichMatrix * r << std::endl;
-  std::cout << "b = " << b << std::endl;
+  std::cout << "b = " << b << std::endl;*/
 
   for (size_t j = 0; j != nReactions(); ++j) {
     m_ropf[j] = std::max(0., -r(j));
