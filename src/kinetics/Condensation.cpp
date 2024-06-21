@@ -120,11 +120,15 @@ void Condensation::updateROP() {
   // m_rbuf -> current activity 
 
   Eigen::VectorXd b(nReactions());
+  Eigen::SparseMatrix<double> stoich(m_stoichMatrix);
 
   for (int j = 0; j < nReactions(); j++) {
     // inactive reactions
     if (m_rfn[j] < 0.0) {
       b(j) = 0.0;
+      for (int i = 0; i < nTotalSpecies(); i++) {
+        stoich.coeffRef(i,j) = 0.0;
+      }
       continue;
     }
 
@@ -148,7 +152,8 @@ void Condensation::updateROP() {
     }
   }
 
-  auto A = jac * m_stoichMatrix;
+  //auto A = jac * m_stoichMatrix;
+  auto A = jac * stoich;
 
   Eigen::SparseQR<Eigen::SparseMatrix<double>, Eigen::COLAMDOrdering<int>> solver;
   solver.compute(A);
@@ -160,9 +165,11 @@ void Condensation::updateROP() {
   }
 
   /*std::cout << jac << std::endl;
+  std::cout << A << std::endl;
+  std::cout << A.transpose() * A << std::endl;
   std::cout << "r = " << -r << std::endl;
-  std::cout << "S.r = " << -m_stoichMatrix * r << std::endl;
-  std::cout << "b = " << b << std::endl;*/
+  std::cout << "S.r = " << -m_stoichMatrix * r << std::endl;*/
+  std::cout << "b = " << b << std::endl;
 
   for (size_t j = 0; j != nReactions(); ++j) {
     m_ropf[j] = std::max(0., -r(j));
@@ -229,6 +236,11 @@ Eigen::SparseMatrix<double> Condensation::netRatesOfProgress_ddCi()
   m_reactantStoich.multiply(m_actConc.data(), m_rbuf0.data());
 
   for (size_t j = 0; j < nReactions(); ++j) {
+    // inactive reactions
+    if (m_rfn[j] < 0.0) {
+      continue;
+    }
+
     double ss = m_rbuf0[j] - m_rfn[j];
     size_t order = m_reactions[j]->reactants.size();
     auto& R = m_reactions[j];
@@ -238,10 +250,8 @@ Eigen::SparseMatrix<double> Condensation::netRatesOfProgress_ddCi()
       size_t iy = kineticsSpeciesIndex(R->products.begin()->first);
       double y = m_actConc[iy];
 
-      if (ss > 0.) {
+      if (ss > 0. || (ss < 0. && y > - ss)) {
         jac.coeffRef(j, ix) = 1.;
-      } else if (y < - ss) {
-        jac.coeffRef(j, ix) = -1.;
       } else {
         jac.coeffRef(j, iy) = -1.;
       }
@@ -254,11 +264,11 @@ Eigen::SparseMatrix<double> Condensation::netRatesOfProgress_ddCi()
       double x2 = m_actConc[ix2];
       double y = m_actConc[iy];
       double react = x1 + x2;
-      double delta = - react + sqrt(react * react - 4 * ss) / 2.;
-      if (ss > 0. || (ss < 0. && y > delta)) {
+      double delta = (react - sqrt(react * react - 4 * ss)) / 2.;
+      if (ss > 0. || (ss < 0. && y > - delta)) {
         jac.coeffRef(j, ix1) = (1. - (x1 - x2) / sqrt(react * react - 4 * ss)) / 2.;
         jac.coeffRef(j, ix2) = (1. - (x2 - x1) / sqrt(react * react - 4 * ss)) / 2.;
-      } else {  // y < delta
+      } else {  // y < -delta
         jac.coeffRef(j, iy) = -1.;
       }
     }
