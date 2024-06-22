@@ -46,7 +46,7 @@ inline double satfunc2v(double s, double x1, double x2, double y)
 }
 
 inline void set_jac2v(
-    SparseMatrix<double> &jac, double s, double const *conc,
+    Eigen::SparseMatrix<double> &jac, double s, double const *conc,
     int j, int ix1, int ix2, int iy)
 {
   double const& x1 = conc[ix1];
@@ -71,15 +71,17 @@ inline double satfunc1p(double s, double x, double y, double g)
     return -y;
   }
 
+  std::cout << "s = " << s << ", x = " << x << ", y = " << y << ", g = " << g << std::endl;
+
   double rate = (x - s * g) / (1. - s);
 
   if (rate > 0. || (rate < 0. && y > - rate)) {
     return rate;
   }
-  return -y
+  return -y;
 }
 
-inline void set_jac1p(SparseMatrix<double> &jac, 
+inline void set_jac1p(Eigen::SparseMatrix<double> &jac, 
                       double s, double const* frac, double g,
                       int j, int ix, int iy)
 {
@@ -110,10 +112,10 @@ inline double satfunc2p(double s, double x1, double x2, double y, double g)
   if (rate > 0. || (rate < 0. && y > - rate)) {
     return rate;
   }
-  return -y
+  return -y;
 }
 
-inline void set_jac2p(SparseMatrix<double> &jac,
+inline void set_jac2p(Eigen::SparseMatrix<double> &jac,
                       double s, double const* frac, double g,
                       int j, int ix1, int ix2, int iy)
 {
@@ -166,23 +168,7 @@ void Condensation::resizeReactions()
   for (auto& rates : m_interfaceRates) {
     rates->resize(nTotalSpecies(), nReactions(), nPhases());
   }
-}
-
-void Condensation::getActivityConcentrations(double* const conc)
-{
-  if (m_use_mole_fraction) {
-    _update_rates_X();
-    copy(m_frac.begin(), m_frac.end(), conc);
-  } else {
-    _update_rates_C();
-    copy(m_conc.begin(), m_conc.end(), conc);
-  }
-}
-
-void Condensation::getFwdRateConstants(double* kfwd)
-{
-  updateROP();
-  copy(m_rfn.begin(), m_rfn.end(), kfwd);
+  m_jac.resize(nReactions(), nTotalSpecies());
 }
 
 void Condensation::resizeSpecies()
@@ -195,7 +181,20 @@ void Condensation::resizeSpecies()
   }
 
   m_conc.resize(m_kk);
-  m_frac.resize(m_kk);
+}
+
+void Condensation::getActivityConcentrations(double* const conc)
+{
+  if (m_use_mole_fraction) {
+    _update_rates_X(conc);
+  } else {
+    _update_rates_C(conc);
+  }
+}
+
+void Condensation::getFwdRateConstants(double* kfwd)
+{
+  _update_rates_T(kfwd);
 }
 
 bool Condensation::addReaction(shared_ptr<Reaction> r_base, bool resize)
@@ -203,7 +202,7 @@ bool Condensation::addReaction(shared_ptr<Reaction> r_base, bool resize)
   size_t i = nReactions();
   bool added = Kinetics::addReaction(r_base, resize);
   if (!added) {
-      return false;
+    return false;
   }
 
   // Set index of rate to number of reaction within kinetics
@@ -213,7 +212,7 @@ bool Condensation::addReaction(shared_ptr<Reaction> r_base, bool resize)
 
   string rtype = rate->subType();
   if (rtype == "") {
-      rtype = rate->type();
+    rtype = rate->type();
   }
 
   if (rtype == "nucleation") {
@@ -246,7 +245,7 @@ bool Condensation::addReaction(shared_ptr<Reaction> r_base, bool resize)
 void Condensation::updateROP() {
   _update_rates_T(m_rfn.data());
   if (m_use_mole_fraction) {
-    _update_rates_X(m_frac.data());
+    _update_rates_X(m_conc.data());
   } else {
     _update_rates_C(m_conc.data());
   }
@@ -260,10 +259,15 @@ void Condensation::updateROP() {
   double pres = thermo(0).pressure() + thermo(1).pressure();
   double temp = thermo(1).temperature();
   double dens = pres / (GasConstant * temp);
-  double xgas = 0.;
-  for (size_t k = 0; k < nPhases(); k++)
-    for (size_t i = 0; i < thermo(k).nSpecies(); i++)
-      xgas += m_frac[i + m_start[k]];
+  double xgas = m_conc[0];
+  std::cout << "xgas = " << xgas << std::endl;
+
+  if (m_use_mole_fraction) {
+    for (size_t i = 0; i < thermo(1).nSpecies(); i++) {
+      xgas += m_conc[i + m_start[1]];
+      std::cout << "xgas = " << xgas << std::endl;
+    }
+  }
 
   Eigen::VectorXd b(nReactions());
   Eigen::SparseMatrix<double> stoich(m_stoichMatrix);
@@ -282,9 +286,10 @@ void Condensation::updateROP() {
     auto& R = m_reactions[j];
     size_t ix = kineticsSpeciesIndex(R->reactants.begin()->first);
     size_t iy = kineticsSpeciesIndex(R->products.begin()->first);
+
     if (m_use_mole_fraction) {
-      b(j) = satfunc1p(m_rfn[j] / dens, m_frac[ix], m_frac[iy], xgas);
-      set_jac1p(m_jac, m_rfn[j] / dens, m_frac.data(), xgas, j, ix, iy);
+      b(j) = satfunc1p(m_rfn[j] / dens, m_conc[ix], m_conc[iy], xgas);
+      set_jac1p(m_jac, m_rfn[j] / dens, m_conc.data(), xgas, j, ix, iy);
     } else {
       b(j) = satfunc1v(m_rfn[j], m_conc[ix], m_conc[iy]);
       set_jac1v(m_jac, m_rfn[j], m_conc.data(), j, ix, iy);
@@ -306,9 +311,10 @@ void Condensation::updateROP() {
     size_t ix1 = kineticsSpeciesIndex(R->reactants.begin()->first);
     size_t ix2 = kineticsSpeciesIndex(next(R->reactants.begin())->first);
     size_t iy = kineticsSpeciesIndex(R->products.begin()->first);
+
     if (m_use_mole_fraction) {
-      b(j) = satfunc2p(m_rfn[j] / (dens * dens), m_frac[ix1], m_frac[ix2], m_frac[iy], xgas);
-      set_jac2p(m_jac, m_rfn[j] / (dens * dens), m_frac.data(), xgas, j, ix1, ix2, iy);
+      b(j) = satfunc2p(m_rfn[j] / (dens * dens), m_conc[ix1], m_conc[ix2], m_conc[iy], xgas);
+      set_jac2p(m_jac, m_rfn[j] / (dens * dens), m_conc.data(), xgas, j, ix1, ix2, iy);
     } else {
       b(j) = satfunc2v(m_rfn[j], m_conc[ix1], m_conc[ix2], m_conc[iy]);
       set_jac2v(m_jac, m_rfn[j], m_conc.data(), j, ix1, ix2, iy);
@@ -322,13 +328,13 @@ void Condensation::updateROP() {
     size_t iy2 = kineticsSpeciesIndex(R->products.begin()->first);
     
     if (temp > m_rfn[j]) { // higher than freezing temperature
-      if (m_frac[iy2] > 0.) {
-        b(j) = - m_frac[iy2];
+      if (m_conc[iy2] > 0.) {
+        b(j) = - m_conc[iy2];
         m_jac.coeffRef(j, iy2) = -1.;
       }
     } else { // lower than freezing temperature
-      if (m_frac[iy1] > 0.) {
-        b(j) = m_frac[iy1];
+      if (m_conc[iy1] > 0.) {
+        b(j) = m_conc[iy1];
         m_jac.coeffRef(j, iy1) = 1.;
       }
     }
@@ -385,12 +391,12 @@ void Condensation::_update_rates_C(double *pdata)
 
 void Condensation::_update_rates_X(double *pdata)
 {
-  for (size_t n = 0; n < nPhases(); n++) {
-    const auto& tp = thermo(n);
-    tp.getMoleFractions(pdata + m_start[n]);
-  }
+  _update_rates_C(pdata);
 
-  m_ROP_ok = false;
+  // scale to mole fractions
+  double sum = std::accumulate(pdata, pdata + nTotalSpecies(), 0.0);
+  for (int i = 0; i < nTotalSpecies(); i++)
+    pdata[i] /= sum;
 }
 
 Eigen::SparseMatrix<double> Condensation::netRatesOfProgress_ddX()

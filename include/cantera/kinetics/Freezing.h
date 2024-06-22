@@ -1,5 +1,5 @@
-#ifndef CT_MELTING_H
-#define CT_MELTING_H
+#ifndef CT_FREEZING_H
+#define CT_FREEZING_H
 
 #include <functional>
 
@@ -15,13 +15,13 @@ namespace Cantera
 class AnyValue;
 class AnyMap;
 
-class MeltingRate : public ReactionRate {
+class FreezingRate : public ReactionRate {
  public:
-  MeltingRate() = default;
-  MeltingRate(const AnyMap& node, const UnitStack& rate_units);
+  FreezingRate() = default;
+  FreezingRate(const AnyMap& node, const UnitStack& rate_units);
 
   unique_ptr<MultiRateBase> newMultiRate() const override {
-    return make_unique<MultiRate<MeltingRate, ArrheniusData>>();
+    return make_unique<MultiRate<FreezingRate, ArrheniusData>>();
   }
 
   //! Set the rate parameters for this reaction.
@@ -30,7 +30,7 @@ class MeltingRate : public ReactionRate {
                          const AnyMap& node);
 
   //! return the rate coefficient type
-  const string type() const override { return "melting"; }
+  const string type() const override { return "freezing"; }
 
   void getParameters(AnyMap& rateNode, const Units& rate_units=Units(0.)) const;
   using ReactionRate::getParameters;
@@ -40,7 +40,7 @@ class MeltingRate : public ReactionRate {
   double evalFromStruct(const ArrheniusData& shared_data) const;
 
  protected:
-  string m_melt_str = "formula";
+  string m_formula_str = "formula";
   std::function<double(double)> m_meltfunc;
 
   double m_t3 = 0.0;

@@ -25,6 +25,21 @@ class IdealGasSurfPhase: public SurfPhase
   string phaseOfMatter() const override {
     return "gas";
   }
+
+  double pressure() const override {
+    return GasConstant * molarDensity() * temperature();
+  }
+
+  void setPressure(double p) override {
+    setDensity(p * meanMolecularWeight() / RT());
+  }
+
+ protected:
+  // dimensionless parameters
+  double m_h0_RT;
+  double m_cp0_R;
+  double m_g0_RT;
+  double m_s0_R;
 };
 
 }

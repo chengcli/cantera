@@ -13,10 +13,16 @@ class Condensation : public Kinetics {
   ~Condensation() override {}
 
   void setQuantityMoleFraction() {
+    if (!m_use_mole_fraction) {
+      m_ROP_ok = false;
+    }
     m_use_mole_fraction = true;
   }
 
   void setQuantityConcentration() {
+    if (m_use_mole_fraction) {
+      m_ROP_ok = false;
+    }
     m_use_mole_fraction = false;
   }
 
@@ -57,11 +63,11 @@ class Condensation : public Kinetics {
   Eigen::SparseMatrix<double> calculateCompositionDerivatives(
       StoichManagerN& stoich, const vector<double>& in, bool ddX=true);
 
-  //! activity concentration
+  //! This variable has two interpretations.
+  //! If m_use_mole_fraction is true, then it is the vector of mole fractions.
+  //! If m_use_mole_fraction is false, then it is the vector of concentrations.
   vector<double> m_conc;
 
-  //! activity mole fraction
-  vector<double> m_frac;
 
   //! Number of dimensions of reacting phase (2 for InterfaceKinetics, 1 for
   //! EdgeKinetics)
@@ -81,7 +87,7 @@ class Condensation : public Kinetics {
   vector<size_t> m_jyy;
 
   //! rate jacobian matrix
-  Eigen::SparseMatrix<double> m_jac(nReactions(), nTotalSpecies());
+  Eigen::SparseMatrix<double> m_jac;
 
   bool m_use_mole_fraction = false;
   bool m_ROP_ok = false;

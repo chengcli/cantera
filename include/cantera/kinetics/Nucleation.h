@@ -30,7 +30,7 @@ class NucleationRate : public ReactionRate {
                          const AnyMap& node);
 
   //! return the rate coefficient type
-  const string type() const override { return "condensation"; }
+  const string type() const override { return "nucleation"; }
 
   void getParameters(AnyMap& rateNode, const Units& rate_units=Units(0.)) const;
   using ReactionRate::getParameters;

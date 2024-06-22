@@ -19,7 +19,7 @@
 #include "cantera/kinetics/TwoTempPlasmaRate.h"
 #include "cantera/kinetics/Photolysis.h"
 #include "cantera/kinetics/Nucleation.h"
-#include "cantera/kinetics/Melting.h"
+#include "cantera/kinetics/Freezing.h"
 
 namespace Cantera
 {
@@ -119,11 +119,11 @@ ReactionRateFactory::ReactionRateFactory()
     });
     addAlias("nucleation", "interface-nucleation");
 
-    // Melting evaluator
-    reg("melting", [](const AnyMap& node, const UnitStack& rate_units) {
-        return new MeltingRate(node, rate_units);
+    // Freezing evaluator
+    reg("freezing", [](const AnyMap& node, const UnitStack& rate_units) {
+        return new FreezingRate(node, rate_units);
     });
-    addAlias("melting", "interface-melting");
+    addAlias("freezing", "interface-freezing");
 }
 
 ReactionRateFactory* ReactionRateFactory::factory() {
