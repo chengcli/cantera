@@ -1,5 +1,5 @@
-#ifndef CT_NUCLEATION_H
-#define CT_NUCLEATION_H
+#ifndef CT_MELTING_H
+#define CT_MELTING_H
 
 #include <functional>
 
@@ -15,13 +15,13 @@ namespace Cantera
 class AnyValue;
 class AnyMap;
 
-class NucleationRate : public ReactionRate {
+class MeltingRate : public ReactionRate {
  public:
-  NucleationRate() = default;
-  NucleationRate(const AnyMap& node, const UnitStack& rate_units);
+  MeltingRate() = default;
+  MeltingRate(const AnyMap& node, const UnitStack& rate_units);
 
   unique_ptr<MultiRateBase> newMultiRate() const override {
-    return make_unique<MultiRate<NucleationRate, ArrheniusData>>();
+    return make_unique<MultiRate<MeltingRate, ArrheniusData>>();
   }
 
   //! Set the rate parameters for this reaction.
@@ -30,7 +30,7 @@ class NucleationRate : public ReactionRate {
                          const AnyMap& node);
 
   //! return the rate coefficient type
-  const string type() const override { return "condensation"; }
+  const string type() const override { return "melting"; }
 
   void getParameters(AnyMap& rateNode, const Units& rate_units=Units(0.)) const;
   using ReactionRate::getParameters;
@@ -40,22 +40,11 @@ class NucleationRate : public ReactionRate {
   double evalFromStruct(const ArrheniusData& shared_data) const;
 
  protected:
-  string m_svp_str = "formula";
-  std::function<double(double)> m_svpfunc;
-
-  size_t m_order = 1;
+  string m_melt_str = "formula";
+  std::function<double(double)> m_meltfunc;
 
   double m_t3 = 0.0;
-  double m_p3 = 0.0;
-  double m_beta = 0.0;
-  double m_delta = 0.0;
-
-  double m_min_temp = 0.0;
-  double m_max_temp = 1.0e30;
 };
-
-std::function<double(double)> find_svp_function(const Composition& reactants, 
-                                                const string& svp_name);
 
 }
 

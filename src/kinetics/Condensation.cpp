@@ -9,22 +9,152 @@
 namespace Cantera
 {
 
-// Only works for A -> B (order 1)
-inline double saturation_function1(double ss, double react, double prod)
+// x -> y at constant volume (mole concentration)
+inline double satfunc1v(double s, double x, double y)
 {
-  if (ss < 0) {
-    return -std::min(prod, -ss);
+  double rate = x - s;
+  if (rate > 0. || (rate < 0. && y > - rate)) {
+    return rate;
   }
-  return ss;
+  return -y;
 }
 
-// Only works for A + B -> C (order 2)
-inline double saturation_function2(double ss, double react, double prod)
+inline void set_jac1v(
+    Eigen::SparseMatrix<double> &jac, double s, double const *conc,
+    int j, int ix, int iy)
 {
-  if (ss < 0.) {
-    return -std::min(prod, (- react + sqrt(react * react - 4 * ss)) / 2.);
+  double const& x = conc[ix];
+  double const& y = conc[iy];
+  double rate = x - s;
+  if (rate > 0. || (rate < 0. && y > - rate)) {
+    jac.coeffRef(j, ix) = 1.;
+  } else {
+    jac.coeffRef(j, iy) = -1.;
   }
-  return (react - sqrt(react * react - 4 * ss)) / 2.;
+}
+
+// x1 + x2 -> y at constant volume (mole concentration)
+inline double satfunc2v(double s, double x1, double x2, double y)
+{
+  double delta = (x1 - x2) * (x1 - x2) + 4 * s;
+  double rate = (x1 + x2 - sqrt(delta)) / 2.;
+
+  if (rate > 0. || (rate < 0. && y > - rate)) {
+    return rate;
+  }
+  return -y;
+}
+
+inline void set_jac2v(
+    SparseMatrix<double> &jac, double s, double const *conc,
+    int j, int ix1, int ix2, int iy)
+{
+  double const& x1 = conc[ix1];
+  double const& x2 = conc[ix2];
+  double const& y = conc[iy];
+  double delta = (x1 - x2) * (x1 - x2) + 4 * s;
+  double rate = (x1 + x2 - sqrt(delta)) / 2.;
+
+  if (rate > 0. || (rate < 0. && y > - rate)) {
+    jac.coeffRef(j, ix1) = (1. - (x1 - x2) / sqrt(delta)) / 2.;
+    jac.coeffRef(j, ix2) = (1. - (x2 - x1) / sqrt(delta)) / 2.;
+  } else {
+    jac.coeffRef(j, iy) = -1.;
+  }
+}
+
+// x -> y at constant pressure (mole fraction)
+inline double satfunc1p(double s, double x, double y, double g)
+{
+  // boil all condensates
+  if (s > 1.) {
+    return -y;
+  }
+
+  double rate = (x - s * g) / (1. - s);
+
+  if (rate > 0. || (rate < 0. && y > - rate)) {
+    return rate;
+  }
+  return -y
+}
+
+inline void set_jac1p(SparseMatrix<double> &jac, 
+                      double s, double const* frac, double g,
+                      int j, int ix, int iy)
+{
+  // boil all condensates
+  if (s > 1.) {
+    jac.coeffRef(j, iy) = -1.;
+    return;
+  }
+
+  double const& x = frac[ix];
+  double const& y = frac[iy];
+
+  double rate = (x - s * g) / (1. - s);
+
+  if (rate > 0. || (rate < 0. && y > - rate)) {
+    jac.coeffRef(j, ix) = 1.;
+  } else {
+    jac.coeffRef(j, iy) = -1.;
+  }
+}
+
+// x1 + x2 -> y at constant pressure (mole fraction)
+inline double satfunc2p(double s, double x1, double x2, double y, double g)
+{
+  double delta = (x1 - x2) * (x1 - x2) + 4 * s * (g - 2. * x1) * (g - 2. * x2);
+  double rate = (x1 + x2 - 4 * g * s - sqrt(delta)) / (2. * (1. - 4. * s));
+
+  if (rate > 0. || (rate < 0. && y > - rate)) {
+    return rate;
+  }
+  return -y
+}
+
+inline void set_jac2p(SparseMatrix<double> &jac,
+                      double s, double const* frac, double g,
+                      int j, int ix1, int ix2, int iy)
+{
+  double const& x1 = frac[ix1];
+  double const& x2 = frac[ix2];
+  double const& y = frac[iy];
+
+  double delta = (x1 - x2) * (x1 - x2) + 4 * s * (g - 2. * x1) * (g - 2. * x2);
+  double rate = (x1 + x2 - 4 * g * s - sqrt(delta)) / (2. * (1. - 4. * s));
+
+  if (rate > 0. || (rate < 0. && y > - rate)) {
+    jac.coeffRef(j, ix1) = (1. - (x1 - x2) / sqrt(delta)) / 2.;
+    jac.coeffRef(j, ix2) = (1. - (x2 - x1) / sqrt(delta)) / 2.;
+  } else {
+    jac.coeffRef(j, iy) = -1.;
+  }
+}
+
+inline Eigen::VectorXd linear_solve_rop(
+    Eigen::SparseMatrix<double> const& jac,
+    Eigen::SparseMatrix<double> const& stoich,
+    Eigen::VectorXd const& b)
+{
+  auto A = jac * stoich;
+
+  Eigen::SparseQR<Eigen::SparseMatrix<double>, Eigen::COLAMDOrdering<int>> solver;
+  solver.compute(A);
+  Eigen::VectorXd r = solver.solve(b);
+
+  if (solver.info() != Eigen::Success) {
+    throw CanteraError("Condensation::updateROP",
+                       "Failed to solve for net rates of progress.");
+  }
+
+  std::cout << jac << std::endl;
+  std::cout << A << std::endl;
+  std::cout << A.transpose() * A << std::endl;
+  std::cout << "b = " << b << std::endl;
+  std::cout << "r = " << -r << std::endl;
+
+  return r;
 }
 
 void Condensation::resizeReactions()
@@ -36,13 +166,17 @@ void Condensation::resizeReactions()
   for (auto& rates : m_interfaceRates) {
     rates->resize(nTotalSpecies(), nReactions(), nPhases());
   }
-  m_satf.resize(nReactions());
 }
 
 void Condensation::getActivityConcentrations(double* const conc)
 {
-  _update_rates_C();
-  copy(m_actConc.begin(), m_actConc.end(), conc);
+  if (m_use_mole_fraction) {
+    _update_rates_X();
+    copy(m_frac.begin(), m_frac.end(), conc);
+  } else {
+    _update_rates_C();
+    copy(m_conc.begin(), m_conc.end(), conc);
+  }
 }
 
 void Condensation::getFwdRateConstants(double* kfwd)
@@ -60,7 +194,8 @@ void Condensation::resizeSpecies()
           " species to InterfaceKinetics after reactions have been added.");
   }
 
-  m_actConc.resize(m_kk);
+  m_conc.resize(m_kk);
+  m_frac.resize(m_kk);
 }
 
 bool Condensation::addReaction(shared_ptr<Reaction> r_base, bool resize)
@@ -81,6 +216,19 @@ bool Condensation::addReaction(shared_ptr<Reaction> r_base, bool resize)
       rtype = rate->type();
   }
 
+  if (rtype == "nucleation") {
+    if (r_base->reactants.size() == 1) {
+      m_jxy.push_back(i);
+    } else if (r_base->reactants.size() == 2) {
+      m_jxxy.push_back(i);
+    }
+  } else if (rtype == "freezing") {
+    m_jyy.push_back(i);
+  } else {
+    throw CanteraError("Condensation::addReaction",
+                       "Unknown reaction type '{}'", rtype);
+  }
+
   // If necessary, add new interface MultiRate evaluator
   if (m_interfaceTypes.find(rtype) == m_interfaceTypes.end()) {
     m_interfaceTypes[rtype] = m_interfaceRates.size();
@@ -96,33 +244,32 @@ bool Condensation::addReaction(shared_ptr<Reaction> r_base, bool resize)
 }
 
 void Condensation::updateROP() {
-  auto jac = netRatesOfProgress_ddCi();
+  _update_rates_T(m_rfn.data());
+  if (m_use_mole_fraction) {
+    _update_rates_X(m_frac.data());
+  } else {
+    _update_rates_C(m_conc.data());
+  }
 
   if (m_ROP_ok) {
     return;
   }
 
-  std::fill(m_rbuf0.begin(), m_rbuf0.end(), 1.0);
+  m_jac.setZero();
 
-  /*for (size_t i = 0; i < m_actConc.size(); i++) {
-    std::cout << "actConc[" << i << "] = " << m_actConc[i] << std::endl;
-  }*/
-
-  // multiply ropf by the activity concentration reaction orders to obtain
-  // the forward rates of progress.
-  m_reactantStoich.multiply(m_actConc.data(), m_rbuf0.data());
-
-  /*for (size_t j = 0; j != nReactions(); ++j) {
-    std::cout << "rbuf[" << j << "] = " << m_rbuf0[j] << std::endl;
-  }*/
-
-  // m_rfn -> saturation activity 
-  // m_rbuf -> current activity 
+  double pres = thermo(0).pressure() + thermo(1).pressure();
+  double temp = thermo(1).temperature();
+  double dens = pres / (GasConstant * temp);
+  double xgas = 0.;
+  for (size_t k = 0; k < nPhases(); k++)
+    for (size_t i = 0; i < thermo(k).nSpecies(); i++)
+      xgas += m_frac[i + m_start[k]];
 
   Eigen::VectorXd b(nReactions());
   Eigen::SparseMatrix<double> stoich(m_stoichMatrix);
 
-  for (int j = 0; j < nReactions(); j++) {
+  // nucleation: x <=> y
+  for (auto j : m_jxy) {
     // inactive reactions
     if (m_rfn[j] < 0.0) {
       b(j) = 0.0;
@@ -132,57 +279,74 @@ void Condensation::updateROP() {
       continue;
     }
 
-    // calculate saturation function
-    double ss = m_rbuf0[j] - m_rfn[j];
-    size_t order = m_reactions[j]->reactants.size();
     auto& R = m_reactions[j];
-
-    if (order == 1) { // order 1
-      size_t iy = kineticsSpeciesIndex(R->products.begin()->first);
-      double y = m_actConc[iy];
-      b(j) = saturation_function1(ss, 0. /* dummy */, y);
-    } else { // order 2
-      size_t ix1 = kineticsSpeciesIndex(R->reactants.begin()->first);
-      size_t ix2 = kineticsSpeciesIndex(next(R->reactants.begin())->first);
-      size_t iy = kineticsSpeciesIndex(R->products.begin()->first);
-      double x1 = m_actConc[ix1];
-      double x2 = m_actConc[ix2];
-      double y = m_actConc[iy];
-      b(j) = saturation_function2(ss, x1 + x2, y);
+    size_t ix = kineticsSpeciesIndex(R->reactants.begin()->first);
+    size_t iy = kineticsSpeciesIndex(R->products.begin()->first);
+    if (m_use_mole_fraction) {
+      b(j) = satfunc1p(m_rfn[j] / dens, m_frac[ix], m_frac[iy], xgas);
+      set_jac1p(m_jac, m_rfn[j] / dens, m_frac.data(), xgas, j, ix, iy);
+    } else {
+      b(j) = satfunc1v(m_rfn[j], m_conc[ix], m_conc[iy]);
+      set_jac1v(m_jac, m_rfn[j], m_conc.data(), j, ix, iy);
     }
   }
 
-  //auto A = jac * m_stoichMatrix;
-  auto A = jac * stoich;
+  // nucleation: x1 + x2 <=> y
+  for (auto j : m_jxy) {
+    // inactive reactions
+    if (m_rfn[j] < 0.0) {
+      b(j) = 0.0;
+      for (int i = 0; i < nTotalSpecies(); i++) {
+        stoich.coeffRef(i,j) = 0.0;
+      }
+      continue;
+    }
 
-  Eigen::SparseQR<Eigen::SparseMatrix<double>, Eigen::COLAMDOrdering<int>> solver;
-  solver.compute(A);
-  Eigen::VectorXd r = solver.solve(b);
-
-  if (solver.info() != Eigen::Success) {
-    throw CanteraError("Condensation::updateROP",
-                       "Failed to solve for net rates of progress.");
+    auto& R = m_reactions[j];
+    size_t ix1 = kineticsSpeciesIndex(R->reactants.begin()->first);
+    size_t ix2 = kineticsSpeciesIndex(next(R->reactants.begin())->first);
+    size_t iy = kineticsSpeciesIndex(R->products.begin()->first);
+    if (m_use_mole_fraction) {
+      b(j) = satfunc2p(m_rfn[j] / (dens * dens), m_frac[ix1], m_frac[ix2], m_frac[iy], xgas);
+      set_jac2p(m_jac, m_rfn[j] / (dens * dens), m_frac.data(), xgas, j, ix1, ix2, iy);
+    } else {
+      b(j) = satfunc2v(m_rfn[j], m_conc[ix1], m_conc[ix2], m_conc[iy]);
+      set_jac2v(m_jac, m_rfn[j], m_conc.data(), j, ix1, ix2, iy);
+    }
   }
 
-  /*std::cout << jac << std::endl;
-  std::cout << A << std::endl;
-  std::cout << A.transpose() * A << std::endl;
-  std::cout << "r = " << -r << std::endl;
-  std::cout << "S.r = " << -m_stoichMatrix * r << std::endl;*/
-  std::cout << "b = " << b << std::endl;
+  // freezing: y1 <=> y2
+  for (auto j : m_jyy) {
+    auto& R = m_reactions[j];
+    size_t iy1 = kineticsSpeciesIndex(R->reactants.begin()->first);
+    size_t iy2 = kineticsSpeciesIndex(R->products.begin()->first);
+    
+    if (temp > m_rfn[j]) { // higher than freezing temperature
+      if (m_frac[iy2] > 0.) {
+        b(j) = - m_frac[iy2];
+        m_jac.coeffRef(j, iy2) = -1.;
+      }
+    } else { // lower than freezing temperature
+      if (m_frac[iy1] > 0.) {
+        b(j) = m_frac[iy1];
+        m_jac.coeffRef(j, iy1) = 1.;
+      }
+    }
+  }
+
+  // solve the optimal net rates
+  auto r = linear_solve_rop(m_jac, stoich, b);
 
   for (size_t j = 0; j != nReactions(); ++j) {
     m_ropf[j] = std::max(0., -r(j));
-    //m_ropf[j] = std::max(0., b(j));
     m_ropr[j] = std::max(0., r(j));
-    //m_ropr[j] = std::max(0., -b(j));
     m_ropnet[j] = m_ropf[j] - m_ropr[j];
   }
 
   m_ROP_ok = true;
 }
 
-void Condensation::_update_rates_T()
+void Condensation::_update_rates_T(double *pdata)
 {
   // Go find the temperature from the surface
   double T = thermo(0).temperature();
@@ -196,18 +360,15 @@ void Condensation::_update_rates_T()
   for (auto& rates : m_interfaceRates) {
     bool changed = rates->update(thermo(0), *this);
     if (changed) {
-      rates->getRateConstants(m_rfn.data());
+      rates->getRateConstants(pdata);
       m_ROP_ok = false;
     }
   }
 }
 
-void Condensation::_update_rates_C()
+void Condensation::_update_rates_C(double *pdata)
 {
-  // dry air has activity concentration of 0.0
-  m_actConc[0] = 0.0;
-
-  for (size_t n = 1; n < nPhases(); n++) {
+  for (size_t n = 0; n < nPhases(); n++) {
     const auto& tp = thermo(n);
     /*
      * We call the getActivityConcentrations function of each ThermoPhase
@@ -216,65 +377,32 @@ void Condensation::_update_rates_C()
      * the vector m_conc. m_start[] are integer indices for that vector
      * denoting the start of the species for each phase.
      */
-    tp.getActivityConcentrations(m_actConc.data() + m_start[n]);
+    tp.getActivityConcentrations(pdata + m_start[n]);
   }
+
   m_ROP_ok = false;
+}
+
+void Condensation::_update_rates_X(double *pdata)
+{
+  for (size_t n = 0; n < nPhases(); n++) {
+    const auto& tp = thermo(n);
+    tp.getMoleFractions(pdata + m_start[n]);
+  }
+
+  m_ROP_ok = false;
+}
+
+Eigen::SparseMatrix<double> Condensation::netRatesOfProgress_ddX()
+{
+  updateROP();
+  return m_jac;
 }
 
 Eigen::SparseMatrix<double> Condensation::netRatesOfProgress_ddCi()
 {
-  // set rate constants, m_rfn
-  _update_rates_T();
-
-  // set activity concentrations, m_actConc
-  _update_rates_C();
-
-  // forward reaction rate coefficients
-  Eigen::SparseMatrix<double> jac(nReactions(), nTotalSpecies());
-
-  std::fill(m_rbuf0.begin(), m_rbuf0.end(), 1.0);
-  m_reactantStoich.multiply(m_actConc.data(), m_rbuf0.data());
-
-  for (size_t j = 0; j < nReactions(); ++j) {
-    // inactive reactions
-    if (m_rfn[j] < 0.0) {
-      continue;
-    }
-
-    double ss = m_rbuf0[j] - m_rfn[j];
-    size_t order = m_reactions[j]->reactants.size();
-    auto& R = m_reactions[j];
-
-    if (order == 1) {
-      size_t ix = kineticsSpeciesIndex(R->reactants.begin()->first);
-      size_t iy = kineticsSpeciesIndex(R->products.begin()->first);
-      double y = m_actConc[iy];
-
-      if (ss > 0. || (ss < 0. && y > - ss)) {
-        jac.coeffRef(j, ix) = 1.;
-      } else {
-        jac.coeffRef(j, iy) = -1.;
-      }
-    } else { // order 2
-      size_t ix1 = kineticsSpeciesIndex(R->reactants.begin()->first);
-      size_t ix2 = kineticsSpeciesIndex(next(R->reactants.begin())->first);
-      size_t iy = kineticsSpeciesIndex(R->products.begin()->first);
-
-      double x1 = m_actConc[ix1];
-      double x2 = m_actConc[ix2];
-      double y = m_actConc[iy];
-      double react = x1 + x2;
-      double delta = (react - sqrt(react * react - 4 * ss)) / 2.;
-      if (ss > 0. || (ss < 0. && y > - delta)) {
-        jac.coeffRef(j, ix1) = (1. - (x1 - x2) / sqrt(react * react - 4 * ss)) / 2.;
-        jac.coeffRef(j, ix2) = (1. - (x2 - x1) / sqrt(react * react - 4 * ss)) / 2.;
-      } else {  // y < -delta
-        jac.coeffRef(j, iy) = -1.;
-      }
-    }
-  }
-
-  return jac;
+  updateROP();
+  return m_jac;
 }
 
 }
