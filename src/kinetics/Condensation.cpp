@@ -5,6 +5,7 @@
 #include "cantera/kinetics/Reaction.h"
 #include "cantera/kinetics/Condensation.h"
 #include "cantera/thermo/ThermoPhase.h"
+#include "cantera/thermo/IdealMoistPhase.h"
 
 namespace Cantera
 {
@@ -256,24 +257,25 @@ void Condensation::updateROP() {
 
   m_jac.setZero();
 
-  double pres = thermo(0).pressure() + thermo(1).pressure();
-  double temp = thermo(1).temperature();
+  double pres = thermo().pressure();
+  double temp = thermo().temperature();
   double dens = pres / (GasConstant * temp);
   double xgas = m_conc[0];
-  std::cout << "xgas = " << xgas << std::endl;
 
   if (m_use_mole_fraction) {
-    for (size_t i = 0; i < thermo(1).nSpecies(); i++) {
-      xgas += m_conc[i + m_start[1]];
-      std::cout << "xgas = " << xgas << std::endl;
+    size_t nvapor = static_cast<IdealMoistPhase&>(thermo()).nVapor();
+    for (size_t i = 1; i <= nvapor; i++) {
+      xgas += m_conc[i];
     }
   }
+  std::cout << "xgas = " << xgas << std::endl;
 
   Eigen::VectorXd b(nReactions());
   Eigen::SparseMatrix<double> stoich(m_stoichMatrix);
 
   // nucleation: x <=> y
   for (auto j : m_jxy) {
+    std::cout << "jxy = " << j << std::endl;
     // inactive reactions
     if (m_rfn[j] < 0.0) {
       b(j) = 0.0;
@@ -297,7 +299,8 @@ void Condensation::updateROP() {
   }
 
   // nucleation: x1 + x2 <=> y
-  for (auto j : m_jxy) {
+  for (auto j : m_jxxy) {
+    std::cout << "jxxy = " << j << std::endl;
     // inactive reactions
     if (m_rfn[j] < 0.0) {
       b(j) = 0.0;
@@ -355,7 +358,7 @@ void Condensation::updateROP() {
 void Condensation::_update_rates_T(double *pdata)
 {
   // Go find the temperature from the surface
-  double T = thermo(0).temperature();
+  double T = thermo().temperature();
 
   if (T != m_temp) {
     m_temp = T;
@@ -364,7 +367,7 @@ void Condensation::_update_rates_T(double *pdata)
 
   // loop over interface MultiRate evaluators for each reaction type
   for (auto& rates : m_interfaceRates) {
-    bool changed = rates->update(thermo(0), *this);
+    bool changed = rates->update(thermo(), *this);
     if (changed) {
       rates->getRateConstants(pdata);
       m_ROP_ok = false;
@@ -374,29 +377,14 @@ void Condensation::_update_rates_T(double *pdata)
 
 void Condensation::_update_rates_C(double *pdata)
 {
-  for (size_t n = 0; n < nPhases(); n++) {
-    const auto& tp = thermo(n);
-    /*
-     * We call the getActivityConcentrations function of each ThermoPhase
-     * class that makes up this kinetics object to obtain the generalized
-     * concentrations for species within that class. This is collected in
-     * the vector m_conc. m_start[] are integer indices for that vector
-     * denoting the start of the species for each phase.
-     */
-    tp.getActivityConcentrations(pdata + m_start[n]);
-  }
-
+  thermo().getActivityConcentrations(pdata);
   m_ROP_ok = false;
 }
 
 void Condensation::_update_rates_X(double *pdata)
 {
-  _update_rates_C(pdata);
-
-  // scale to mole fractions
-  double sum = std::accumulate(pdata, pdata + nTotalSpecies(), 0.0);
-  for (int i = 0; i < nTotalSpecies(); i++)
-    pdata[i] /= sum;
+  thermo().getMoleFractions(pdata);
+  m_ROP_ok = false;
 }
 
 Eigen::SparseMatrix<double> Condensation::netRatesOfProgress_ddX()

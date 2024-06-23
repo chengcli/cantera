@@ -376,7 +376,7 @@ void Phase::setMassFractionsPartial(const double* const y, size_t stride)
 
     // fix negative concentration
     for (size_t k = 1; k < m_kk; k++) {
-        m_y[k] = std::max(y[k*stride], 0.0);
+        m_y[k] = std::max(y[(k - 1)*stride], 0.0);
         sum += m_y[k];
     }
     m_y[0] = 1.0 - sum;
