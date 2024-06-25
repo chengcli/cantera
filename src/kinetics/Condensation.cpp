@@ -14,6 +14,8 @@ namespace Cantera
 inline pair<double, double> satfunc1v(double s, double x, double y,
                                       double logs_ddT = 0.)
 {
+  if (y < 0.) return {-y, 0.};
+
   double rate = x - s;
   if (rate > 0. || (rate < 0. && y > - rate)) {
     return {rate, - s * logs_ddT};
@@ -39,6 +41,8 @@ inline void set_jac1v(
 inline pair<double, double> satfunc2v(double s, double x1, double x2, double y,
                                       double logs_ddT = 0.)
 {
+  if (y < 0.) return {-y, 0.};
+
   double delta = (x1 - x2) * (x1 - x2) + 4 * s;
   double rate = (x1 + x2 - sqrt(delta)) / 2.;
 
@@ -378,17 +382,10 @@ void Condensation::updateROP() {
 
   // scale rate down if some species becomes negative
   Eigen::VectorXd rates = - stoich * r;
-  double alpha = 1.;
-  for (size_t i = 0; i < nTotalSpecies(); i++) {
-    if (m_conc[i] + rates[i] < 0.) {
-      alpha = std::min(alpha, - m_conc[i] / rates[i]);
-    }
-  }
-  std::cout << "alpha = " << alpha << std::endl;
 
   for (size_t j = 0; j != nReactions(); ++j) {
-    m_ropf[j] = std::max(0., -r(j) * alpha);
-    m_ropr[j] = std::max(0., r(j) * alpha);
+    m_ropf[j] = std::max(0., -r(j));
+    m_ropr[j] = std::max(0., r(j));
     m_ropnet[j] = m_ropf[j] - m_ropr[j];
   }
 
