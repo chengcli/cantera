@@ -11,13 +11,14 @@ namespace Cantera
 {
 
 // x -> y at constant volume (mole concentration)
-inline double satfunc1v(double s, double x, double y)
+inline pair<double, double> satfunc1v(double s, double x, double y,
+                                      double logs_ddT = 0.)
 {
   double rate = x - s;
   if (rate > 0. || (rate < 0. && y > - rate)) {
-    return rate;
+    return {rate, - s * logs_ddT};
   }
-  return -y;
+  return {-y, 0.};
 }
 
 inline void set_jac1v(
@@ -35,15 +36,16 @@ inline void set_jac1v(
 }
 
 // x1 + x2 -> y at constant volume (mole concentration)
-inline double satfunc2v(double s, double x1, double x2, double y)
+inline pair<double, double> satfunc2v(double s, double x1, double x2, double y,
+                                      double logs_ddT = 0.)
 {
   double delta = (x1 - x2) * (x1 - x2) + 4 * s;
   double rate = (x1 + x2 - sqrt(delta)) / 2.;
 
   if (rate > 0. || (rate < 0. && y > - rate)) {
-    return rate;
+    return {rate, - s * logs_ddT / sqrt(delta)};
   }
-  return -y;
+  return {-y, 0.};
 }
 
 inline void set_jac2v(
@@ -163,13 +165,12 @@ inline Eigen::VectorXd linear_solve_rop(
 void Condensation::resizeReactions()
 {
   Kinetics::resizeReactions();
-  m_rbuf0.resize(nReactions());
-  m_rbuf1.resize(nReactions());
 
   for (auto& rates : m_interfaceRates) {
     rates->resize(nTotalSpecies(), nReactions(), nPhases());
   }
   m_jac.resize(nReactions(), nTotalSpecies());
+  m_rfn_ddT.resize(nReactions());
 }
 
 void Condensation::resizeSpecies()
@@ -182,6 +183,8 @@ void Condensation::resizeSpecies()
   }
 
   m_conc.resize(m_kk);
+  m_intEng.resize(m_kk);
+  m_cv.resize(m_kk);
 }
 
 void Condensation::getActivityConcentrations(double* const pdata)
@@ -195,7 +198,12 @@ void Condensation::getActivityConcentrations(double* const pdata)
 
 void Condensation::getFwdRateConstants(double* kfwd)
 {
-  _update_rates_T(kfwd);
+  _update_rates_T(kfwd, nullptr);
+}
+
+void Condensation::getFwdRateConstants_ddT(double* kfwd)
+{
+  _update_rates_T(nullptr, kfwd);
 }
 
 bool Condensation::addReaction(shared_ptr<Reaction> r_base, bool resize)
@@ -244,7 +252,7 @@ bool Condensation::addReaction(shared_ptr<Reaction> r_base, bool resize)
 }
 
 void Condensation::updateROP() {
-  _update_rates_T(m_rfn.data());
+  _update_rates_T(m_rfn.data(), m_rfn_ddT.data());
   if (m_use_mole_fraction) {
     _update_rates_X(m_conc.data());
   } else {
@@ -270,17 +278,21 @@ void Condensation::updateROP() {
   }
 
   Eigen::VectorXd b(nReactions());
+  Eigen::VectorXd b_ddT(nReactions());
   Eigen::SparseMatrix<double> stoich(m_stoichMatrix);
+  Eigen::SparseMatrix<double> rate_ddT(nReactions(), nTotalSpecies());
+
+  b.setZero();
+  b_ddT.setZero();
+  rate_ddT.setZero();
 
   // nucleation: x <=> y
   for (auto j : m_jxy) {
     std::cout << "jxy = " << j << std::endl;
     // inactive reactions
     if (m_rfn[j] < 0.0) {
-      b(j) = 0.0;
-      for (int i = 0; i < nTotalSpecies(); i++) {
+      for (int i = 0; i < nTotalSpecies(); i++)
         stoich.coeffRef(i,j) = 0.0;
-      }
       continue;
     }
 
@@ -292,7 +304,9 @@ void Condensation::updateROP() {
       b(j) = satfunc1p(m_rfn[j] / dens, m_conc[ix], m_conc[iy], xgas);
       set_jac1p(m_jac, m_rfn[j] / dens, m_conc.data(), xgas, j, ix, iy);
     } else {
-      b(j) = satfunc1v(m_rfn[j], m_conc[ix], m_conc[iy]);
+      auto result = satfunc1v(m_rfn[j], m_conc[ix], m_conc[iy], m_rfn_ddT[j]);
+      b(j) = result.first;
+      b_ddT(j) = result.second;
       set_jac1v(m_jac, m_rfn[j], m_conc.data(), j, ix, iy);
     }
   }
@@ -302,10 +316,8 @@ void Condensation::updateROP() {
     std::cout << "jxxy = " << j << std::endl;
     // inactive reactions
     if (m_rfn[j] < 0.0) {
-      b(j) = 0.0;
-      for (int i = 0; i < nTotalSpecies(); i++) {
+      for (int i = 0; i < nTotalSpecies(); i++)
         stoich.coeffRef(i,j) = 0.0;
-      }
       continue;
     }
 
@@ -318,7 +330,9 @@ void Condensation::updateROP() {
       b(j) = satfunc2p(m_rfn[j] / (dens * dens), m_conc[ix1], m_conc[ix2], m_conc[iy], xgas);
       set_jac2p(m_jac, m_rfn[j] / (dens * dens), m_conc.data(), xgas, j, ix1, ix2, iy);
     } else {
-      b(j) = satfunc2v(m_rfn[j], m_conc[ix1], m_conc[ix2], m_conc[iy]);
+      auto result = satfunc2v(m_rfn[j], m_conc[ix1], m_conc[ix2], m_conc[iy], m_rfn_ddT[j]);
+      b(j) = result.first;
+      b_ddT(j) = result.second;
       set_jac2v(m_jac, m_rfn[j], m_conc.data(), j, ix1, ix2, iy);
     }
   }
@@ -342,6 +356,22 @@ void Condensation::updateROP() {
     }
   }
 
+  std::cout << "b_ddt = " << b_ddT << std::endl;
+
+  // set up temperature gradient
+  if (!m_use_mole_fraction) {
+    for (size_t j = 0; j != nReactions(); ++j) {
+      if (b_ddT[j] != 0.) {
+        for (size_t i = 0; i != nTotalSpecies(); ++i)
+          rate_ddT.coeffRef(j, i) = b_ddT[j] * m_intEng[i];
+      }
+    }
+
+    std::cout << "u = " << m_intEng << std::endl;
+    std::cout << "cc = " << m_conc.dot(m_cv) << std::endl;
+    m_jac -= rate_ddT / m_conc.dot(m_cv);
+  }
+
   // solve the optimal net rates
   auto r = linear_solve_rop(m_jac, stoich, b);
 
@@ -354,7 +384,7 @@ void Condensation::updateROP() {
   m_ROP_ok = true;
 }
 
-void Condensation::_update_rates_T(double *pdata)
+void Condensation::_update_rates_T(double *pdata, double *pdata_ddT)
 {
   // Go find the temperature from the surface
   double T = thermo().temperature();
@@ -364,11 +394,20 @@ void Condensation::_update_rates_T(double *pdata)
     m_ROP_ok = false;
   }
 
+  if (pdata_ddT != nullptr) {
+    std::fill(pdata_ddT, pdata_ddT + nReactions(), 1.);
+  }
+
   // loop over interface MultiRate evaluators for each reaction type
   for (auto& rates : m_interfaceRates) {
     bool changed = rates->update(thermo(), *this);
     if (changed) {
-      rates->getRateConstants(pdata);
+      if (pdata != nullptr) {
+        rates->getRateConstants(pdata);
+      }
+      if (pdata_ddT != nullptr) {
+        rates->processRateConstants_ddT(pdata_ddT, nullptr, 0.);
+      }
       m_ROP_ok = false;
     }
   }
@@ -377,6 +416,13 @@ void Condensation::_update_rates_T(double *pdata)
 void Condensation::_update_rates_C(double *pdata)
 {
   thermo().getActivityConcentrations(pdata);
+  thermo().getIntEnergy_RT(m_intEng.data());
+  thermo().getCv_R(m_cv.data());
+
+  for (size_t i = 0; i < m_kk; i++) {
+    m_intEng[i] *= thermo().temperature();
+  }
+
   m_ROP_ok = false;
 }
 

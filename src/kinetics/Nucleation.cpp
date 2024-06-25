@@ -20,8 +20,8 @@ string concatenate(const Composition& comp, char sep) {
   return result;
 }
 
-std::function<double(double)> find_svp_function(const Composition& reactants,
-                                                const string& svp_name) 
+std::function<double(double)> find_svp(const Composition& reactants,
+                                       const string& svp_name) 
 {
   string name = concatenate(reactants, '-') + '-' + svp_name;
 
@@ -33,8 +33,25 @@ std::function<double(double)> find_svp_function(const Composition& reactants,
     return svp_nh3_Antoine;
   }
 
-  throw CanteraError("find_svp_function",
+  throw CanteraError("find_svp",
                      "No SVP function found for reaction '{}'.", name);
+}
+
+std::function<double(double)> find_logsvp_ddT(const Composition& reactants,
+                                              const string& svp_name) 
+{
+  string name = concatenate(reactants, '-') + '-' + svp_name;
+
+  if (name == "NH3-H2S-lewis" || name == "H2S-NH3-lewis") {
+    return logsvp_ddT_nh3_h2s_Lewis;
+  } else if (name == "H2O-antoine") {
+    return nullptr; // logsvp_ddT_h2o_Antoine;
+  } else if (name == "NH3-antoine") {
+    return nullptr; // logsvp_ddT_nh3_Antoine;
+  }
+
+  throw CanteraError("find_logsvp_ddT",
+                     "No SVP_DDT function found for reaction '{}'.", name);
 }
 
 NucleationRate::NucleationRate(const AnyMap& node, const UnitStack& rate_units)
@@ -66,7 +83,7 @@ void NucleationRate::setRateParameters(
   }
 
   auto& rate_map = rate.as<AnyMap>();
-  string svp_name = rate_map[m_svp_str].asString();
+  string svp_name = rate_map[m_formula_str].asString();
 
   if (rate.hasKey("minT")) {
     m_min_temp = rate_map["minT"].asDouble();
@@ -76,19 +93,27 @@ void NucleationRate::setRateParameters(
     m_max_temp = rate_map["maxT"].asDouble();
   };
 
+  Reaction rtmp;
+  parseReactionEquation(rtmp, equation.asString(), node, nullptr);
+  m_order = rtmp.reactants.size();
+
   if (svp_name == "ideal") {
     m_t3 = rate_map["T3"].asDouble();
     m_p3 = rate_map["P3"].asDouble();
     m_beta = rate_map["beta"].asDouble();
     m_delta = rate_map["delta"].asDouble();
-    m_svpfunc = [this](double T) {
+    m_svp = [this](double T) {
       return m_p3 * exp((1. - m_t3 / T) * m_beta - m_delta * log(T / m_t3));
     };
+    m_logsvp_ddT = [this](double T) {
+      return m_beta * m_t3 / (T * T) - m_delta / T;
+    };
+    if (m_delta > 0.) {
+      m_max_temp = m_beta * m_t3 / m_delta;
+    }
   } else {
-    Reaction rtmp;
-    parseReactionEquation(rtmp, equation.asString(), node, nullptr);
-    m_svpfunc = find_svp_function(rtmp.reactants, svp_name);
-    m_order = rtmp.reactants.size();
+    m_svp = find_svp(rtmp.reactants, svp_name);
+    m_logsvp_ddT = find_logsvp_ddT(rtmp.reactants, svp_name);
   }
 
   m_valid = true;
@@ -104,13 +129,23 @@ void NucleationRate::validate(const string& equation, const Kinetics& kin)
 
 double NucleationRate::evalFromStruct(const ArrheniusData& shared_data) const
 {
-  if (shared_data.temperature < m_min_temp || shared_data.temperature > m_max_temp) {
+  double T = shared_data.temperature;
+  if (T < m_min_temp || T > m_max_temp) {
     return -1;
   }
 
-  double RT = GasConstant * shared_data.temperature;
+  double RT = GasConstant * T;
+  return m_svp(T) / pow(RT, m_order);
+}
 
-  return m_svpfunc(shared_data.temperature) / pow(RT, m_order);
+double NucleationRate::ddTScaledFromStruct(const ArrheniusData& shared_data) const
+{
+  double T = shared_data.temperature;
+  if (T < m_min_temp || T > m_max_temp) {
+    return 0.;
+  }
+
+  return m_logsvp_ddT(T) - m_order / T;
 }
 
 void NucleationRate::getParameters(AnyMap& rateNode, const Units& rate_units) const

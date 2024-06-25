@@ -39,9 +39,16 @@ class NucleationRate : public ReactionRate {
 
   double evalFromStruct(const ArrheniusData& shared_data) const;
 
+  double ddTScaledFromStruct(const ArrheniusData& shared_data) const;
+
  protected:
-  string m_svp_str = "formula";
-  std::function<double(double)> m_svpfunc;
+  string m_formula_str = "formula";
+
+  //! returns s = svp(T)/RT or svp(T)/(RT)^2
+  std::function<double(double)> m_svp;
+
+  //! returns d(log(s))/dT
+  std::function<double(double)> m_logsvp_ddT;
 
   size_t m_order = 1;
 

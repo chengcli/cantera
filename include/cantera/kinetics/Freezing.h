@@ -39,6 +39,10 @@ class FreezingRate : public ReactionRate {
 
   double evalFromStruct(const ArrheniusData& shared_data) const;
 
+  double ddTScaledFromStruct(const ArrheniusData& shared_data) const {
+    return 0.;
+  }
+
  protected:
   string m_formula_str = "formula";
   std::function<double(double)> m_meltfunc;

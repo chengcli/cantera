@@ -40,6 +40,8 @@ class Condensation : public Kinetics {
 
   void getFwdRateConstants(double* kfwd) override;
 
+  void getFwdRateConstants_ddT(double* dkfwd) override;
+
   void resizeSpecies() override;
 
   bool addReaction(shared_ptr<Reaction> r, bool resize=true) override;
@@ -50,7 +52,7 @@ class Condensation : public Kinetics {
   Eigen::SparseMatrix<double> netRatesOfProgress_ddX() override;
 
  protected:
-  void _update_rates_T(double *pdata);
+  void _update_rates_T(double *pdata, double *pdata_ddT);
   void _update_rates_C(double *pdata);
   void _update_rates_X(double *pdata);
 
@@ -66,7 +68,9 @@ class Condensation : public Kinetics {
   //! This variable has two interpretations.
   //! If m_use_mole_fraction is true, then it is the vector of mole fractions.
   //! If m_use_mole_fraction is false, then it is the vector of concentrations.
-  vector<double> m_conc;
+  Eigen::VectorXd m_conc;
+  Eigen::VectorXd m_intEng;
+  Eigen::VectorXd m_cv;
 
   //! Number of dimensions of reacting phase (2 for InterfaceKinetics, 1 for
   //! EdgeKinetics)
@@ -87,6 +91,9 @@ class Condensation : public Kinetics {
 
   //! rate jacobian matrix
   Eigen::SparseMatrix<double> m_jac;
+
+  //! rate jacobian with respect to temperature
+  vector<double> m_rfn_ddT;
 
   bool m_use_mole_fraction = false;
   bool m_ROP_ok = false;
