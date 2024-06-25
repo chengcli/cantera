@@ -184,12 +184,12 @@ void Condensation::resizeSpecies()
   m_conc.resize(m_kk);
 }
 
-void Condensation::getActivityConcentrations(double* const conc)
+void Condensation::getActivityConcentrations(double* const pdata)
 {
   if (m_use_mole_fraction) {
-    _update_rates_X(conc);
+    _update_rates_X(pdata);
   } else {
-    _update_rates_C(conc);
+    _update_rates_C(pdata);
   }
 }
 
@@ -260,15 +260,14 @@ void Condensation::updateROP() {
   double pres = thermo().pressure();
   double temp = thermo().temperature();
   double dens = pres / (GasConstant * temp);
-  double xgas = m_conc[0];
+  double xgas = 0.;
 
   if (m_use_mole_fraction) {
-    size_t nvapor = static_cast<IdealMoistPhase&>(thermo()).nVapor();
-    for (size_t i = 1; i <= nvapor; i++) {
+    size_t ngas = static_cast<IdealMoistPhase&>(thermo()).nGas();
+    for (size_t i = 0; i < ngas; i++)
       xgas += m_conc[i];
-    }
+    std::cout << "xgas = " << xgas << std::endl;
   }
-  std::cout << "xgas = " << xgas << std::endl;
 
   Eigen::VectorXd b(nReactions());
   Eigen::SparseMatrix<double> stoich(m_stoichMatrix);

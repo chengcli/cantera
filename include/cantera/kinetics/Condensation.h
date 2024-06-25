@@ -32,7 +32,7 @@ class Condensation : public Kinetics {
     return "nucleation";
   }
 
-  void getActivityConcentrations(double* const conc) override;
+  void getActivityConcentrations(double* const pdata) override;
 
   bool isReversible(size_t i) override {
     return true;
@@ -67,7 +67,6 @@ class Condensation : public Kinetics {
   //! If m_use_mole_fraction is true, then it is the vector of mole fractions.
   //! If m_use_mole_fraction is false, then it is the vector of concentrations.
   vector<double> m_conc;
-
 
   //! Number of dimensions of reacting phase (2 for InterfaceKinetics, 1 for
   //! EdgeKinetics)
