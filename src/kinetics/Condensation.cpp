@@ -369,15 +369,26 @@ void Condensation::updateROP() {
 
     std::cout << "u = " << m_intEng << std::endl;
     std::cout << "cc = " << m_conc.dot(m_cv) << std::endl;
+    std::cout << "cv = " << m_cv << std::endl;
     m_jac -= rate_ddT / m_conc.dot(m_cv);
   }
 
   // solve the optimal net rates
   auto r = linear_solve_rop(m_jac, stoich, b);
 
+  // scale rate down if some species becomes negative
+  Eigen::VectorXd rates = - stoich * r;
+  double alpha = 1.;
+  for (size_t i = 0; i < nTotalSpecies(); i++) {
+    if (m_conc[i] + rates[i] < 0.) {
+      alpha = std::min(alpha, - m_conc[i] / rates[i]);
+    }
+  }
+  std::cout << "alpha = " << alpha << std::endl;
+
   for (size_t j = 0; j != nReactions(); ++j) {
-    m_ropf[j] = std::max(0., -r(j));
-    m_ropr[j] = std::max(0., r(j));
+    m_ropf[j] = std::max(0., -r(j) * alpha);
+    m_ropr[j] = std::max(0., r(j) * alpha);
     m_ropnet[j] = m_ropf[j] - m_ropr[j];
   }
 
