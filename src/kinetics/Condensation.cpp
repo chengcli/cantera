@@ -78,7 +78,7 @@ inline double satfunc1p(double s, double x, double y, double g)
     return -y;
   }
 
-  std::cout << "s = " << s << ", x = " << x << ", y = " << y << ", g = " << g << std::endl;
+  //std::cout << "s = " << s << ", x = " << x << ", y = " << y << ", g = " << g << std::endl;
 
   double rate = (x - s * g) / (1. - s);
 
@@ -157,11 +157,11 @@ inline Eigen::VectorXd linear_solve_rop(
                        "Failed to solve for net rates of progress.");
   }
 
-  std::cout << jac << std::endl;
+  /*std::cout << jac << std::endl;
   std::cout << A << std::endl;
   std::cout << A.transpose() * A << std::endl;
   std::cout << "b = " << b << std::endl;
-  std::cout << "r = " << -r << std::endl;
+  std::cout << "r = " << -r << std::endl;*/
 
   return r;
 }
@@ -278,7 +278,7 @@ void Condensation::updateROP() {
     size_t ngas = static_cast<IdealMoistPhase&>(thermo()).nGas();
     for (size_t i = 0; i < ngas; i++)
       xgas += m_conc[i];
-    std::cout << "xgas = " << xgas << std::endl;
+    //std::cout << "xgas = " << xgas << std::endl;
   }
 
   Eigen::VectorXd b(nReactions());
@@ -292,7 +292,7 @@ void Condensation::updateROP() {
 
   // nucleation: x <=> y
   for (auto j : m_jxy) {
-    std::cout << "jxy = " << j << std::endl;
+    // std::cout << "jxy = " << j << std::endl;
     // inactive reactions
     if (m_rfn[j] < 0.0) {
       for (int i = 0; i < nTotalSpecies(); i++)
@@ -317,7 +317,7 @@ void Condensation::updateROP() {
 
   // nucleation: x1 + x2 <=> y
   for (auto j : m_jxxy) {
-    std::cout << "jxxy = " << j << std::endl;
+    //std::cout << "jxxy = " << j << std::endl;
     // inactive reactions
     if (m_rfn[j] < 0.0) {
       for (int i = 0; i < nTotalSpecies(); i++)
@@ -360,7 +360,7 @@ void Condensation::updateROP() {
     }
   }
 
-  std::cout << "b_ddt = " << b_ddT << std::endl;
+  //std::cout << "b_ddt = " << b_ddT << std::endl;
 
   // set up temperature gradient
   if (!m_use_mole_fraction) {
@@ -371,9 +371,9 @@ void Condensation::updateROP() {
       }
     }
 
-    std::cout << "u = " << m_intEng << std::endl;
+    /*std::cout << "u = " << m_intEng << std::endl;
     std::cout << "cc = " << m_conc.dot(m_cv) << std::endl;
-    std::cout << "cv = " << m_cv << std::endl;
+    std::cout << "cv = " << m_cv << std::endl;*/
     m_jac -= rate_ddT / m_conc.dot(m_cv);
   }
 
