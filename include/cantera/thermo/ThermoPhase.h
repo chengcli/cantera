@@ -925,6 +925,17 @@ public:
         throw NotImplementedError("ThermoPhase::getCp_R");
     }
 
+    //! Get the nondimensional Heat Capacities at constant volume for the
+    //! species standard states at the current *T* and *P* of the
+    //! solution
+    /*!
+     * @param cpr   Output vector of nondimensional standard state heat
+     *              capacities. Length: m_kk.
+     */
+    virtual void getCv_R(double* cvr) const {
+        throw NotImplementedError("ThermoPhase::getCv_R");
+    }
+
     //!  Get the molar volumes of the species standard states at the current
     //!  *T* and *P* of the solution.
     /*!

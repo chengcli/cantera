@@ -303,6 +303,11 @@ public:
      */
     size_t kineticsSpeciesIndex(const string& nm) const;
 
+    //! shorthand for kineticsSpeciesIndex
+    size_t speciesIndex(const string& nm) const {
+      return kineticsSpeciesIndex(nm);
+    }
+
     /**
      * This function looks up the name of a species and returns a
      * reference to the ThermoPhase object of the phase where the species

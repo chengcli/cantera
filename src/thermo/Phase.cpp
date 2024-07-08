@@ -338,10 +338,10 @@ void Phase::setMoleFractionsByName(const string& x)
     setMoleFractionsByName(parseCompString(x));
 }
 
-void Phase::setMassFractions(const double* const y)
+void Phase::setMassFractions(const double* const y, size_t stride)
 {
     for (size_t k = 0; k < m_kk; k++) {
-        m_y[k] = std::max(y[k], 0.0); // Ignore negative mass fractions
+        m_y[k] = std::max(y[k*stride], 0.0); // Ignore negative mass fractions
     }
     double norm = accumulate(m_y.begin(), m_y.end(), 0.0);
     scale(m_y.begin(), m_y.end(), m_y.begin(), 1.0/norm);
@@ -352,14 +352,38 @@ void Phase::setMassFractions(const double* const y)
     compositionChanged();
 }
 
-void Phase::setMassFractions_NoNorm(const double* const y)
+void Phase::setMassFractions_NoNorm(const double* const y, size_t stride)
 {
     double sum = 0.0;
-    copy(y, y + m_kk, m_y.begin());
+    if (stride == 1) {
+      copy(y, y + m_kk, m_y.begin());
+    } else {
+      for (size_t k = 0; k < m_kk; k++) {
+        m_y[k] = std::max(y[k*stride], 0.0); // Ignore negative mass fractions
+      }
+    }
+
     transform(m_y.begin(), m_y.end(), m_rmolwts.begin(), m_ym.begin(),
               multiplies<double>());
     sum = accumulate(m_ym.begin(), m_ym.end(), 0.0);
     m_mmw = 1.0/sum;
+    compositionChanged();
+}
+
+void Phase::setMassFractionsPartial(const double* const y, size_t stride)
+{
+    double sum = 0.0;
+
+    // fix negative concentration
+    for (size_t k = 1; k < m_kk; k++) {
+        m_y[k] = std::max(y[(k - 1)*stride], 0.0);
+        sum += m_y[k];
+    }
+    m_y[0] = 1.0 - sum;
+
+    transform(m_y.begin(), m_y.end(), m_rmolwts.begin(),
+              m_ym.begin(), multiplies<double>());
+    m_mmw = 1.0 / accumulate(m_ym.begin(), m_ym.end(), 0.0);
     compositionChanged();
 }
 
