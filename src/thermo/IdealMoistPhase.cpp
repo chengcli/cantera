@@ -48,7 +48,7 @@ bool IdealMoistPhase::addSpecies(shared_ptr<Species> spec) {
     } else if (eos.hasKey("molar-volume")) {
       mv = eos.convert("molar-volume", "m^3/kmol");
     } else {
-      throw CanteraError("IdealSolidSolnPhase::addSpecies",
+      throw CanteraError("IdealMoistPhase::addSpecies",
           "equation-of-state entry for species '{}' is missing "
           "'density', 'molar-volume', or 'molar-density' "
           "specification", spec->name);

@@ -438,6 +438,8 @@ public:
     //!     @param[out] y Array of mass fractions, length nSpecies()
     void getMassFractions(double* const y) const;
 
+    void getMassFractionsPartial(double* y, size_t stride = 1) const;
+
     //! Return a const pointer to the mass fraction array
     const double* massFractions() const {
         return &m_y[0];
@@ -468,6 +470,9 @@ public:
      *                  or equal to the number of species within the phase.
      */
     virtual void getConcentrations(double* const c) const;
+
+    //! Get the species density (kg/m^3).
+    virtual void getDensities(double* const rho, size_t stride = 1) const;
 
     //! Concentration of species k.
     //! If k is outside the valid range, an exception will be thrown.

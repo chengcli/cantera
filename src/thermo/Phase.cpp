@@ -497,6 +497,13 @@ void Phase::getMassFractions(double* const y) const
     copy(m_y.begin(), m_y.end(), y);
 }
 
+void Phase::getMassFractionsPartial(double* y, size_t stride) const
+{
+    for (size_t k = 1; k < m_kk; k++) {
+        y[(k - 1)*stride] = m_y[k];
+    }
+}
+
 double Phase::concentration(const size_t k) const
 {
     checkSpeciesIndex(k);
@@ -506,6 +513,13 @@ double Phase::concentration(const size_t k) const
 void Phase::getConcentrations(double* const c) const
 {
     scale(m_ym.begin(), m_ym.end(), c, m_dens);
+}
+
+void Phase::getDensities(double* const rho, size_t stride) const
+{
+    for (size_t k = 0; k < m_kk; k++) {
+      rho[k * stride] = m_y[k] * m_dens;
+    }
 }
 
 void Phase::setConcentrations(const double* const conc)
