@@ -23,6 +23,12 @@ double IdealMoistPhase::_sum_xlogx_g() const {
   return sumxlogx / sumx + std::log(meanMolecularWeight());
 }
 
+double IdealMoistPhase::entropy_mole() const {
+  double xg = _g_ov_mu() * meanMolecularWeight();
+  return GasConstant * (mean_X(entropy_R_ref()) - _sum_xlogx_g()
+           - xg * std::log(pressure() / (xg * refPressure())));
+}
+
 void IdealMoistPhase::setPressure(double p) {
   if (p <= 0) {
     throw CanteraError("IdealGasPhase::setState_DP",

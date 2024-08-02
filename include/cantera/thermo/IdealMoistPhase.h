@@ -34,10 +34,7 @@ class IdealMoistPhase : public IdealGasPhase {
    *                - \sum_{k \elem G} X_k \ln X_k
    * @f]
    */
-  double entropy_mole() const override {
-    return GasConstant * (mean_X(entropy_R_ref()) - _sum_xlogx_g() 
-           - std::log(pressure() / refPressure()));
-  }
+  double entropy_mole() const override;
 
   /*!
    * @f[ 
