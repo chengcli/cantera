@@ -109,7 +109,7 @@ void NucleationRate::setRateParameters(
       return m_beta * m_t3 / (T * T) - m_delta / T;
     };
     if (m_delta > 0.) {
-      m_max_temp = m_beta * m_t3 / m_delta;
+      m_max_temp = std::min(m_max_temp, m_beta * m_t3 / m_delta);
     }
   } else {
     m_svp = find_svp(rtmp.reactants, svp_name);
