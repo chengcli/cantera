@@ -318,6 +318,9 @@ void Phase::setMoleFractions(const double* const x)
     compositionChanged();
 }
 
+void Phase::incrementMoleFractions(const double* const x)
+{}
+
 void Phase::setMoleFractions_NoNorm(const double* const x)
 {
     m_mmw = dot(x, x + m_kk, m_molwts.begin());

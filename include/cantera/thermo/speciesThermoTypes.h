@@ -12,9 +12,6 @@
 //! Constant Cp
 #define CONSTANT_CP 1
 
-//! Constant Cp Cloud
-#define CONSTANT_CP_CLOUD 1001
-
 //! Polynomial
 #define POLYNOMIAL_4 2
 

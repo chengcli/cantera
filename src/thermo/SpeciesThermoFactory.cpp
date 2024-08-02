@@ -16,7 +16,6 @@
 #include "cantera/thermo/NasaPoly2.h"
 #include "cantera/thermo/ShomatePoly.h"
 #include "cantera/thermo/ConstCpPoly.h"
-#include "cantera/thermo/ConstCpCloudPoly.h"
 #include "cantera/thermo/speciesThermoTypes.h"
 #include "cantera/thermo/VPStandardStateTP.h"
 #include "cantera/base/stringUtils.h"
@@ -36,8 +35,6 @@ SpeciesThermoInterpType* newSpeciesThermoInterpType(int type, double tlow,
     case CONSTANT_CP:
     case SIMPLE:
         return new ConstCpPoly(tlow, thigh, pref, coeffs);
-    case CONSTANT_CP_CLOUD:
-        return new ConstCpCloudPoly(tlow, thigh, pref, coeffs);
     case MU0_INTERP:
         return new Mu0Poly(tlow, thigh, pref, coeffs);
     case SHOMATE2:
@@ -61,8 +58,6 @@ SpeciesThermoInterpType* newSpeciesThermoInterpType(const string& stype,
         itype = NASA2; // two-region 7-coefficient NASA polynomials
     } else if (type == "const_cp" || type == "simple") {
         itype = CONSTANT_CP;
-    } else if (type == "const_cp_cloud") {
-        itype = CONSTANT_CP_CLOUD;
     } else if (type == "shomate" || type == "shomate1") {
         itype = SHOMATE1; // single-region Shomate polynomial
     } else if (type == "shomate2") {
@@ -146,21 +141,6 @@ void setupConstCp(ConstCpPoly& thermo, const AnyMap& node)
     thermo.setParameters(T0, h0, s0, cp0);
 }
 
-void setupConstCpCloud(ConstCpCloudPoly& thermo, const AnyMap& node)
-{
-    setupSpeciesThermo(thermo, node);
-    if (node.hasKey("T-min")) {
-        thermo.setMinTemp(node.convert("T-min", "K"));
-    }
-    if (node.hasKey("T-max")) {
-        thermo.setMaxTemp(node.convert("T-max", "K"));
-    }
-    double T0 = node.convert("T0", "K", 298.15);
-    double h0 = node.convert("h0", "J/kmol", 0.0);
-    double cp0 = node.convert("cp0", "J/kmol/K", 0.0);
-    thermo.setParameters(T0, h0, cp0);
-}
-
 void setupNasa9Poly(Nasa9PolyMultiTempRegion& thermo, const AnyMap& node)
 {
     setupSpeciesThermo(thermo, node);
@@ -221,10 +201,6 @@ unique_ptr<SpeciesThermoInterpType> newSpeciesThermo(const AnyMap& node)
     } else if (model == "constant-cp") {
         auto thermo = make_unique<ConstCpPoly>();
         setupConstCp(*thermo, node);
-        return thermo;
-    } else if (model == "constant-cp-cloud") {
-        auto thermo = make_unique<ConstCpCloudPoly>();
-        setupConstCpCloud(*thermo, node);
         return thermo;
     } else if (model == "piecewise-Gibbs") {
         auto thermo = make_unique<Mu0Poly>();

@@ -177,8 +177,8 @@ public:
     //! Check if data for all species (0 through nSpecies-1) has been installed.
     bool ready(size_t nSpecies);
 
-    shared_ptr<SpeciesThermoInterpType> getSpeciesThermo(size_t k) {
-      return m_sp[m_speciesLoc[k].first][m_speciesLoc[k].second].second;
+    shared_ptr<SpeciesThermoInterpType> getSpeciesThermo(size_t k) const {
+      return m_sp.at(m_speciesLoc.at(k).first)[m_speciesLoc.at(k).second].second;
     }
 
 private:

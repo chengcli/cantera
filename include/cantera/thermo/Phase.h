@@ -427,6 +427,8 @@ public:
     //! have a length greater than or equal to the number of species, m_kk.
     virtual void setMoleFractions(const double* const x);
 
+    virtual void incrementMoleFractions(const double* const x);
+
     //! Set the mole fractions to the specified values without normalizing.
     //! This is useful when the normalization condition is being handled by
     //! some other means, for example by a constraint equation as part of a

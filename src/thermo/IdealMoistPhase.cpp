@@ -1,6 +1,10 @@
 #include "cantera/thermo/IdealMoistPhase.h"
 #include "cantera/thermo/Species.h"
 #include "cantera/base/utilities.h"
+#include "cantera/thermo/speciesThermoTypes.h"
+#include "cantera/kinetics/Kinetics.h"
+#include "cantera/kinetics/ReactionRate.h"
+#include "cantera/kinetics/Reaction.h"
 
 namespace Cantera
 {
@@ -75,13 +79,81 @@ void IdealMoistPhase::getCv_R(double* cvr) const
 void IdealMoistPhase::getIntEnergy_RT_ref(double* urt) const {
   const vector<double>& _h = enthalpy_RT_ref();
 
+  std::cout << "I'm in intEnergy_RT_ref" << std::endl;
   // gas
   for (size_t k = 0; k < nGas(); k++) {
     urt[k] = _h[k] - 1.0;
+    std::cout << _h[k] << std::endl;
   }
 
   // clouds
   copy(_h.begin() + nGas(), _h.end(), urt + nGas());
+}
+
+void IdealMoistPhase::updateFromKinetics(Kinetics& kin) 
+{
+  Composition reactants;
+  m_vapor_index.resize(m_ncloud);
+
+  for (size_t i = 0; i < m_ncloud; i++) {
+    auto name = speciesName(m_kk - m_ncloud + i);
+    for (size_t j = 0; j < kin.nReactions(); j++) {
+      auto rxn = kin.reaction(j);
+      if (rxn->products.size() == 1 && rxn->products.begin()->first == name) 
+      {
+        m_rate.push_back(rxn->rate());
+        reactants = rxn->reactants;
+        break;
+      }
+    }
+
+    if (reactants.empty()) {
+      throw CanteraError("ConstCpCloudPoly::setReaction",
+                         "No reaction found for species " + name);
+    }
+
+    for (auto& [name, _] : reactants) {
+      m_vapor_index[i].push_back(speciesIndex(name));
+    }
+  }
+}
+
+void IdealMoistPhase::updateThermo() const
+{
+    static const int cacheId = m_cache.getId();
+    CachedScalar cached = m_cache.getScalar(cacheId);
+    double tnow = temperature();
+
+    // If the temperature has changed since the last time these
+    // properties were computed, recompute them.
+    if (cached.state1 != tnow) {
+        m_spthermo.update(tnow, &m_cp0_R[0], &m_h0_RT[0], &m_s0_R[0]);
+        cached.state1 = tnow;
+
+        // revise cloud entropy
+        for (size_t i = 0; i < m_ncloud; i++) {
+          int j = m_kk - m_ncloud + i;
+          int order = m_vapor_index[i].size();
+          auto svp = m_rate[i]->eval(tnow) * pow(GasConstant * tnow, order);
+          auto pref = m_spthermo.getSpeciesThermo(j)->refPressure();
+          m_s0_R[j] = - log(svp / pref) + m_h0_RT[j];
+
+          /*std::cout << "svp = " << svp << std::endl;
+          std::cout << "pref = " << pref << std::endl;*/
+          for (auto k : m_vapor_index[i]) {
+            m_s0_R[j] += m_s0_R[k] - m_h0_RT[k];
+            /*std::cout << "k = " << k << ", "
+                      << "sv_R = " << m_s0_R[k] << ", "
+                      << "hv_RT = " << m_h0_RT[k] << std::endl;*/
+          }
+          //std::cout << std::endl;
+        }
+
+        // update the species Gibbs functions
+        for (size_t k = 0; k < m_kk; k++) {
+            m_g0_RT[k] = m_h0_RT[k] - m_s0_R[k];
+        }
+    }
 }
 
 }

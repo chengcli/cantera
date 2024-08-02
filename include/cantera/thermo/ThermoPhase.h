@@ -19,6 +19,8 @@
 namespace Cantera
 {
 
+class Kinetics;
+
 /**
  * @defgroup thermoprops Thermodynamic Properties
  *
@@ -1967,6 +1969,8 @@ public:
     virtual string report(bool show_thermo=true, double threshold=-1e-14) const;
 
     //! @}
+    
+    virtual void updateFromKinetics(Kinetics& kin) {}
 
 protected:
     //! Store the parameters of a ThermoPhase object such that an identical

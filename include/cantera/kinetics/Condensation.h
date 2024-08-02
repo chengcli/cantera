@@ -29,7 +29,7 @@ class Condensation : public Kinetics {
   void resizeReactions() override;
 
   string kineticsType() const override {
-    return "nucleation";
+    return "condensation";
   }
 
   void getActivityConcentrations(double* const pdata) override;
