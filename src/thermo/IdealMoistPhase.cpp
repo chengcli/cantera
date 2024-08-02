@@ -79,11 +79,9 @@ void IdealMoistPhase::getCv_R(double* cvr) const
 void IdealMoistPhase::getIntEnergy_RT_ref(double* urt) const {
   const vector<double>& _h = enthalpy_RT_ref();
 
-  std::cout << "I'm in intEnergy_RT_ref" << std::endl;
   // gas
   for (size_t k = 0; k < nGas(); k++) {
     urt[k] = _h[k] - 1.0;
-    std::cout << _h[k] << std::endl;
   }
 
   // clouds
