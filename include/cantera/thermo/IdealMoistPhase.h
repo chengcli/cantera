@@ -6,6 +6,9 @@
 namespace Cantera
 {
 
+class Kinetics;
+class ReactionRate;
+
 class IdealMoistPhase : public IdealGasPhase {
  public:
   explicit IdealMoistPhase(const std::string& infile = "", const std::string& id=""):
@@ -31,10 +34,7 @@ class IdealMoistPhase : public IdealGasPhase {
    *                - \sum_{k \elem G} X_k \ln X_k
    * @f]
    */
-  double entropy_mole() const override {
-    return GasConstant * (mean_X(entropy_R_ref()) - _sum_xlogx_g() 
-           - std::log(pressure() / refPressure()));
-  }
+  double entropy_mole() const override;
 
   /*!
    * @f[ 
@@ -68,6 +68,8 @@ class IdealMoistPhase : public IdealGasPhase {
     return nSpecies() - m_ncloud;
   }
 
+  void updateFromKinetics(Kinetics& kin) override;
+
  protected:
   /*!
    * @f[
@@ -88,11 +90,19 @@ class IdealMoistPhase : public IdealGasPhase {
   //! Number of cloud species
   size_t m_ncloud = 0;
 
+  //! Index of vapor species forming clouds
+  std::vector<std::vector<int>> m_vapor_index;
+
+  //! Vector of reaction rates for evaluating cloud entropy
+  std::vector<std::shared_ptr<ReactionRate>> m_rate;
+
   //! Vector of molar volumes for each species in the solution
   /**
    * Species molar volumes (@f$ m^3 kmol^-1 @f$) at the current mixture state.
    */
   mutable vector<double> m_speciesMolarVolume;
+
+  void updateThermo() const override;
 };
 
 }

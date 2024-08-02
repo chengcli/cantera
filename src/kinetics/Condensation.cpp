@@ -14,8 +14,6 @@ namespace Cantera
 inline pair<double, double> satfunc1v(double s, double x, double y,
                                       double logs_ddT = 0.)
 {
-  if (y < 0.) return {-y, 0.};
-
   double rate = x - s;
   if (rate > 0. || (rate < 0. && y > - rate)) {
     return {rate, - s * logs_ddT};
@@ -41,8 +39,6 @@ inline void set_jac1v(
 inline pair<double, double> satfunc2v(double s, double x1, double x2, double y,
                                       double logs_ddT = 0.)
 {
-  if (y < 0.) return {-y, 0.};
-
   double delta = (x1 - x2) * (x1 - x2) + 4 * s;
   double rate = (x1 + x2 - sqrt(delta)) / 2.;
 
@@ -292,7 +288,6 @@ void Condensation::updateROP() {
 
   // nucleation: x <=> y
   for (auto j : m_jxy) {
-    // std::cout << "jxy = " << j << std::endl;
     // inactive reactions
     if (m_rfn[j] < 0.0) {
       for (int i = 0; i < nTotalSpecies(); i++)
@@ -343,6 +338,12 @@ void Condensation::updateROP() {
 
   // freezing: y1 <=> y2
   for (auto j : m_jyy) {
+    if (m_rfn[j] < 0.0) {
+      for (int i = 0; i < nTotalSpecies(); i++)
+        stoich.coeffRef(i,j) = 0.0;
+      continue;
+    }
+
     auto& R = m_reactions[j];
     size_t iy1 = kineticsSpeciesIndex(R->reactants.begin()->first);
     size_t iy2 = kineticsSpeciesIndex(R->products.begin()->first);
@@ -360,12 +361,11 @@ void Condensation::updateROP() {
     }
   }
 
-  //std::cout << "b_ddt = " << b_ddT << std::endl;
-
   // set up temperature gradient
   if (!m_use_mole_fraction) {
     for (size_t j = 0; j != nReactions(); ++j) {
-      if (b_ddT[j] != 0.) {
+      // active reactions
+      if (m_rfn[j] > 0. && b_ddT[j] != 0.0)  {
         for (size_t i = 0; i != nTotalSpecies(); ++i)
           rate_ddT.coeffRef(j, i) = b_ddT[j] * m_intEng[i];
       }

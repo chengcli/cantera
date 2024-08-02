@@ -427,6 +427,8 @@ public:
     //! have a length greater than or equal to the number of species, m_kk.
     virtual void setMoleFractions(const double* const x);
 
+    virtual void incrementMoleFractions(const double* const x);
+
     //! Set the mole fractions to the specified values without normalizing.
     //! This is useful when the normalization condition is being handled by
     //! some other means, for example by a constraint equation as part of a
@@ -437,6 +439,8 @@ public:
     //! Get the species mass fractions.
     //!     @param[out] y Array of mass fractions, length nSpecies()
     void getMassFractions(double* const y) const;
+
+    void getMassFractionsPartial(double* y, size_t stride = 1) const;
 
     //! Return a const pointer to the mass fraction array
     const double* massFractions() const {
@@ -468,6 +472,9 @@ public:
      *                  or equal to the number of species within the phase.
      */
     virtual void getConcentrations(double* const c) const;
+
+    //! Get the species density (kg/m^3).
+    virtual void getDensities(double* const rho, size_t stride = 1) const;
 
     //! Concentration of species k.
     //! If k is outside the valid range, an exception will be thrown.
