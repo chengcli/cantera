@@ -31,7 +31,7 @@ double IdealMoistPhase::entropy_mole() const {
 
 void IdealMoistPhase::setPressure(double p) {
   if (p <= 0) {
-    throw CanteraError("IdealGasPhase::setState_DP",
+    throw CanteraError("IdealGasPhase::setPressure",
                        "pressure must be positive");
   }
 

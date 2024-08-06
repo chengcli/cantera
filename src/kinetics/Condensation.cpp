@@ -2,6 +2,8 @@
 #include <numeric>
 #include <algorithm>
 
+#include <Eigen/Dense>
+
 #include "cantera/kinetics/Reaction.h"
 #include "cantera/kinetics/Condensation.h"
 #include "cantera/thermo/ThermoPhase.h"
@@ -135,31 +137,6 @@ inline void set_jac2p(Eigen::SparseMatrix<double> &jac,
   } else {
     jac.coeffRef(j, iy) = -1.;
   }
-}
-
-inline Eigen::VectorXd linear_solve_rop(
-    Eigen::SparseMatrix<double> const& jac,
-    Eigen::SparseMatrix<double> const& stoich,
-    Eigen::VectorXd const& b)
-{
-  auto A = jac * stoich;
-
-  Eigen::SparseQR<Eigen::SparseMatrix<double>, Eigen::COLAMDOrdering<int>> solver;
-  solver.compute(A);
-  Eigen::VectorXd r = solver.solve(b);
-
-  if (solver.info() != Eigen::Success) {
-    throw CanteraError("Condensation::updateROP",
-                       "Failed to solve for net rates of progress.");
-  }
-
-  /*std::cout << jac << std::endl;
-  std::cout << A << std::endl;
-  std::cout << A.transpose() * A << std::endl;
-  std::cout << "b = " << b << std::endl;
-  std::cout << "r = " << -r << std::endl;*/
-
-  return r;
 }
 
 void Condensation::resizeReactions()
@@ -378,10 +355,17 @@ void Condensation::updateROP() {
   }
 
   // solve the optimal net rates
-  auto r = linear_solve_rop(m_jac, stoich, b);
+  Eigen::MatrixXd A = m_jac * stoich;
+  Eigen::VectorXd r = A.colPivHouseholderQr().solve(b);
+
+  /*std::cout << m_jac << std::endl;
+  std::cout << A << std::endl;
+  std::cout << A.transpose() * A << std::endl;
+  std::cout << "b = " << b << std::endl;
+  std::cout << "r = " << -r << std::endl;*/
 
   // scale rate down if some species becomes negative
-  Eigen::VectorXd rates = - stoich * r;
+  //Eigen::VectorXd rates = - stoich * r;
 
   for (size_t j = 0; j != nReactions(); ++j) {
     m_ropf[j] = std::max(0., -r(j));
@@ -394,6 +378,11 @@ void Condensation::updateROP() {
 
 void Condensation::_update_rates_T(double *pdata, double *pdata_ddT)
 {
+  if (nReactions() == 0) {
+    m_ROP_ok = true;
+    return;
+  }
+
   // Go find the temperature from the surface
   double T = thermo().temperature();
 
@@ -423,6 +412,11 @@ void Condensation::_update_rates_T(double *pdata, double *pdata_ddT)
 
 void Condensation::_update_rates_C(double *pdata)
 {
+  if (nReactions() == 0) {
+    m_ROP_ok = true;
+    return;
+  }
+
   thermo().getActivityConcentrations(pdata);
   thermo().getIntEnergy_RT(m_intEng.data());
   thermo().getCv_R(m_cv.data());
@@ -436,6 +430,11 @@ void Condensation::_update_rates_C(double *pdata)
 
 void Condensation::_update_rates_X(double *pdata)
 {
+  if (nReactions() == 0) {
+    m_ROP_ok = true;
+    return;
+  }
+
   thermo().getMoleFractions(pdata);
   m_ROP_ok = false;
 }
