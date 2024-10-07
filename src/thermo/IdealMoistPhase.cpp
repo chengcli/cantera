@@ -48,26 +48,31 @@ double IdealMoistPhase::pressure() const {
 
 bool IdealMoistPhase::addSpecies(shared_ptr<Species> spec) {
   bool added = IdealGasPhase::addSpecies(spec);
-  if (spec->input.hasKey("equation-of-state")) {
-    auto& eos = spec->input["equation-of-state"].getMapWhere("model", "constant-volume");
-    double mv;
-    if (eos.hasKey("density")) {
-      mv = molecularWeight(m_kk-1) / eos.convert("density", "kg/m^3");
-    } else if (eos.hasKey("molar-density")) {
-      mv = 1.0 / eos.convert("molar-density", "kmol/m^3");
-    } else if (eos.hasKey("molar-volume")) {
-      mv = eos.convert("molar-volume", "m^3/kmol");
+
+  if (added) {
+    if (spec->input.hasKey("equation-of-state")) {
+      auto& eos = spec->input["equation-of-state"].getMapWhere("model", "constant-volume");
+      double mv;
+      if (eos.hasKey("density")) {
+        mv = molecularWeight(m_kk-1) / eos.convert("density", "kg/m^3");
+      } else if (eos.hasKey("molar-density")) {
+        mv = 1.0 / eos.convert("molar-density", "kmol/m^3");
+      } else if (eos.hasKey("molar-volume")) {
+        mv = eos.convert("molar-volume", "m^3/kmol");
+      } else {
+        throw CanteraError("IdealMoistPhase::addSpecies",
+            "equation-of-state entry for species '{}' is missing "
+            "'density', 'molar-volume', or 'molar-density' "
+            "specification", spec->name);
+      }
+      m_speciesMolarVolume.push_back(mv);
+      m_ncloud++;
     } else {
-      throw CanteraError("IdealMoistPhase::addSpecies",
-          "equation-of-state entry for species '{}' is missing "
-          "'density', 'molar-volume', or 'molar-density' "
-          "specification", spec->name);
+      m_speciesMolarVolume.push_back(0.);
     }
-    m_speciesMolarVolume.push_back(mv);
-    m_ncloud++;
-  } else {
-    m_speciesMolarVolume.push_back(0.);
   }
+
+  return added;
 }
 
 void IdealMoistPhase::getCv_R(double* cvr) const
