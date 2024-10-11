@@ -139,105 +139,65 @@ inline void set_jac2p(Eigen::SparseMatrix<double> &jac,
   }
 }
 
-void Condensation::resizeReactions()
+bool Condensation::addReaction(shared_ptr<Reaction> r, bool resize)
 {
-  Kinetics::resizeReactions();
-
-  for (auto& rates : m_interfaceRates) {
-    rates->resize(nTotalSpecies(), nReactions(), nPhases());
-  }
-  m_jac.resize(nReactions(), nTotalSpecies());
-  m_rfn_ddT.resize(nReactions());
-}
-
-void Condensation::resizeSpecies()
-{
-  size_t kOld = m_kk;
-  Kinetics::resizeSpecies();
-  if (m_kk != kOld && nReactions()) {
-      throw CanteraError("InterfaceKinetics::resizeSpecies", "Cannot add"
-          " species to InterfaceKinetics after reactions have been added.");
-  }
-
-  m_conc.resize(m_kk);
-  m_intEng.resize(m_kk);
-  m_cv.resize(m_kk);
-}
-
-void Condensation::getActivityConcentrations(double* const pdata)
-{
-  if (m_use_mole_fraction) {
-    _update_rates_X(pdata);
-  } else {
-    _update_rates_C(pdata);
-  }
-}
-
-void Condensation::getFwdRateConstants(double* kfwd)
-{
-  _update_rates_T(kfwd, nullptr);
-}
-
-void Condensation::getFwdRateConstants_ddT(double* kfwd)
-{
-  _update_rates_T(nullptr, kfwd);
-}
-
-bool Condensation::addReaction(shared_ptr<Reaction> r_base, bool resize)
-{
-  size_t i = nReactions();
-  bool added = Kinetics::addReaction(r_base, resize);
+  bool added = BulkKinetics::addReaction(r, resize);
   if (!added) {
     return false;
   }
 
-  // Set index of rate to number of reaction within kinetics
-  shared_ptr<ReactionRate> rate = r_base->rate();
-  rate->setRateIndex(nReactions() - 1);
-  rate->setContext(*r_base, *this);
-
-  string rtype = rate->subType();
+  string rtype = r->rate()->subType();
   if (rtype == "") {
-    rtype = rate->type();
+    rtype = r->rate()->type();
   }
 
   if (rtype == "nucleation") {
-    if (r_base->reactants.size() == 1) {
-      m_jxy.push_back(i);
-    } else if (r_base->reactants.size() == 2) {
-      m_jxxy.push_back(i);
+    if (r->reactants.size() == 1) {
+      m_jxy.push_back(nReactions());
+    } else if (r->reactants.size() == 2) {
+      m_jxxy.push_back(nReactions());
     }
   } else if (rtype == "freezing") {
-    m_jyy.push_back(i);
-  } else {
-    throw CanteraError("Condensation::addReaction",
-                       "Unknown reaction type '{}'", rtype);
+    m_jyy.push_back(nReactions());
   }
-
-  // If necessary, add new interface MultiRate evaluator
-  if (m_interfaceTypes.find(rtype) == m_interfaceTypes.end()) {
-    m_interfaceTypes[rtype] = m_interfaceRates.size();
-    m_interfaceRates.push_back(rate->newMultiRate());
-    m_interfaceRates.back()->resize(m_kk, nReactions(), nPhases());
-  }
-
-  // Add reaction rate to evaluator
-  size_t index = m_interfaceTypes[rtype];
-  m_interfaceRates[index]->add(nReactions() - 1, *rate);
 
   return true;
 }
 
 void Condensation::updateROP() {
-  _update_rates_T(m_rfn.data(), m_rfn_ddT.data());
-  if (m_use_mole_fraction) {
-    _update_rates_X(m_conc.data());
-  } else {
-    _update_rates_C(m_conc.data());
+  BulkKinetics::updateROP();
+
+  /// override rate of progress for thermodynamic reactions
+
+  //! This variable has two interpretations.
+  //! If m_use_mole_fraction is true, then it is the vector of mole fractions.
+  //! If m_use_mole_fraction is false, then it is the vector of concentrations.
+  Eigen::VectorXd m_conc(m_kk);
+  Eigen::VectorXd m_intEng(m_kk);
+  Eigen::VectorXd m_cv(m_kk);
+
+  size_t nfast = m_jxy.size() + m_jxxy.size() + m_jyy.size();
+
+  //! rate jacobian matrix
+  Eigen::SparseMatrix<double> m_jac(nfast, nTotalSpecies());
+
+  //! rate jacobian with respect to temperature
+  vector<double> m_rfn_ddT(nfast);
+
+  for (size_t i = 0; i < nfast; ++i) {
+    m_bulk_rates[i]->processRateConstants_ddT(m_rfn_ddT.data(), nullptr, 0.);
   }
 
-  if (m_ROP_ok) {
-    return;
+  if (m_use_mole_fraction) {
+    thermo().getMoleFractions(m_conc.data());
+  } else {
+    thermo().getActivityConcentrations(m_conc.data());
+    thermo().getIntEnergy_RT(m_intEng.data());
+    thermo().getCv_R(m_cv.data());
+
+    for (size_t i = 0; i < m_kk; i++) {
+      m_intEng[i] *= thermo().temperature();
+    }
   }
 
   m_jac.setZero();
@@ -254,10 +214,10 @@ void Condensation::updateROP() {
     //std::cout << "xgas = " << xgas << std::endl;
   }
 
-  Eigen::VectorXd b(nReactions());
-  Eigen::VectorXd b_ddT(nReactions());
-  Eigen::SparseMatrix<double> stoich(m_stoichMatrix);
-  Eigen::SparseMatrix<double> rate_ddT(nReactions(), nTotalSpecies());
+  Eigen::VectorXd b(nfast);
+  Eigen::VectorXd b_ddT(nfast);
+  Eigen::SparseMatrix<double> stoich(nTotalSpecies(), nfast);
+  Eigen::SparseMatrix<double> rate_ddT(nfast, nTotalSpecies());
 
   b.setZero();
   b_ddT.setZero();
@@ -266,11 +226,9 @@ void Condensation::updateROP() {
   // nucleation: x <=> y
   for (auto j : m_jxy) {
     // inactive reactions
-    if (m_rfn[j] < 0.0) {
-      for (int i = 0; i < nTotalSpecies(); i++)
-        stoich.coeffRef(i,j) = 0.0;
-      continue;
-    }
+    if (m_rfn[j] < 0.0) continue;
+    for (size_t i = 0; i < nTotalSpecies(); ++i)
+      stoich.coeffRef(i,j) = m_stoichMatrix.coeffRef(i,j);
 
     auto& R = m_reactions[j];
     size_t ix = kineticsSpeciesIndex(R->reactants.begin()->first);
@@ -291,11 +249,9 @@ void Condensation::updateROP() {
   for (auto j : m_jxxy) {
     //std::cout << "jxxy = " << j << std::endl;
     // inactive reactions
-    if (m_rfn[j] < 0.0) {
-      for (int i = 0; i < nTotalSpecies(); i++)
-        stoich.coeffRef(i,j) = 0.0;
-      continue;
-    }
+    if (m_rfn[j] < 0.0) continue;
+    for (size_t i = 0; i < nTotalSpecies(); ++i)
+      stoich.coeffRef(i,j) = m_stoichMatrix.coeffRef(i,j);
 
     auto& R = m_reactions[j];
     size_t ix1 = kineticsSpeciesIndex(R->reactants.begin()->first);
@@ -315,11 +271,9 @@ void Condensation::updateROP() {
 
   // freezing: y1 <=> y2
   for (auto j : m_jyy) {
-    if (m_rfn[j] < 0.0) {
-      for (int i = 0; i < nTotalSpecies(); i++)
-        stoich.coeffRef(i,j) = 0.0;
-      continue;
-    }
+    if (m_rfn[j] < 0.0) continue;
+    for (size_t i = 0; i < nTotalSpecies(); ++i)
+      stoich.coeffRef(i,j) = m_stoichMatrix.coeffRef(i,j);
 
     auto& R = m_reactions[j];
     size_t iy1 = kineticsSpeciesIndex(R->reactants.begin()->first);
@@ -340,7 +294,7 @@ void Condensation::updateROP() {
 
   // set up temperature gradient
   if (!m_use_mole_fraction) {
-    for (size_t j = 0; j != nReactions(); ++j) {
+    for (size_t j = 0; j < nfast; ++j) {
       // active reactions
       if (m_rfn[j] > 0. && b_ddT[j] != 0.0)  {
         for (size_t i = 0; i != nTotalSpecies(); ++i)
@@ -367,88 +321,10 @@ void Condensation::updateROP() {
   // scale rate down if some species becomes negative
   //Eigen::VectorXd rates = - stoich * r;
 
-  for (size_t j = 0; j != nReactions(); ++j) {
+  for (size_t j = 0; j < nfast; ++j) {
     m_ropf[j] = std::max(0., -r(j));
     m_ropr[j] = std::max(0., r(j));
     m_ropnet[j] = m_ropf[j] - m_ropr[j];
   }
-
-  m_ROP_ok = true;
 }
-
-void Condensation::_update_rates_T(double *pdata, double *pdata_ddT)
-{
-  if (nReactions() == 0) {
-    m_ROP_ok = true;
-    return;
-  }
-
-  // Go find the temperature from the surface
-  double T = thermo().temperature();
-
-  if (T != m_temp) {
-    m_temp = T;
-    m_ROP_ok = false;
-  }
-
-  if (pdata_ddT != nullptr) {
-    std::fill(pdata_ddT, pdata_ddT + nReactions(), 1.);
-  }
-
-  // loop over interface MultiRate evaluators for each reaction type
-  for (auto& rates : m_interfaceRates) {
-    bool changed = rates->update(thermo(), *this);
-    if (changed) {
-      if (pdata != nullptr) {
-        rates->getRateConstants(pdata);
-      }
-      if (pdata_ddT != nullptr) {
-        rates->processRateConstants_ddT(pdata_ddT, nullptr, 0.);
-      }
-      m_ROP_ok = false;
-    }
-  }
-}
-
-void Condensation::_update_rates_C(double *pdata)
-{
-  if (nReactions() == 0) {
-    m_ROP_ok = true;
-    return;
-  }
-
-  thermo().getActivityConcentrations(pdata);
-  thermo().getIntEnergy_RT(m_intEng.data());
-  thermo().getCv_R(m_cv.data());
-
-  for (size_t i = 0; i < m_kk; i++) {
-    m_intEng[i] *= thermo().temperature();
-  }
-
-  m_ROP_ok = false;
-}
-
-void Condensation::_update_rates_X(double *pdata)
-{
-  if (nReactions() == 0) {
-    m_ROP_ok = true;
-    return;
-  }
-
-  thermo().getMoleFractions(pdata);
-  m_ROP_ok = false;
-}
-
-Eigen::SparseMatrix<double> Condensation::netRatesOfProgress_ddX()
-{
-  updateROP();
-  return m_jac;
-}
-
-Eigen::SparseMatrix<double> Condensation::netRatesOfProgress_ddCi()
-{
-  updateROP();
-  return m_jac;
-}
-
 }
