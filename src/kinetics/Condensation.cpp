@@ -160,6 +160,7 @@ void Condensation::resizeSpecies()
           " species to InterfaceKinetics after reactions have been added.");
   }
 
+  m_conc0.resize(m_kk);
   m_conc.resize(m_kk);
   m_intEng.resize(m_kk);
   m_cv.resize(m_kk);
@@ -210,9 +211,10 @@ bool Condensation::addReaction(shared_ptr<Reaction> r_base, bool resize)
     }
   } else if (rtype == "freezing") {
     m_jyy.push_back(i);
+  } else if (rtype == "evaporation") {
+    m_jevap.push_back(i);
   } else {
-    //throw CanteraError("Condensation::addReaction",
-    //                   "Unknown reaction type '{}'", rtype);
+    m_jcloud.push_back(i);
   }
 
   // If necessary, add new interface MultiRate evaluator
@@ -331,6 +333,26 @@ void Condensation::updateROP() {
         b(j) = m_conc[iy1];
         m_jac(j, iy1) = 1.;
       }
+    }
+  }
+
+  if (m_dt > 0.) {
+    // slow cloud reactions
+    for (auto j : m_jcloud) {
+      for (int i = 0; i < nTotalSpecies(); i++)
+        stoich(i,j) = m_stoichMatrix.coeffRef(i,j);
+    }
+
+    auto& R = m_reactions[j];
+    size_t iy1 = kineticsSpeciesIndex(R->reactants.begin()->first);
+
+    b(j) = (m_conc0[iy1] - m_conc[iy1]) / m_dt - m_rfn[j] * m_conc[iy1];
+    m_jac(j, iy1) = - 1. / m_dt - m_rfn[j];
+
+    // evaporation
+    for (auto j : m_jevap) {
+      for (int i = 0; i < nTotalSpecies(); i++)
+        stoich(i,j) = m_stoichMatrix.coeffRef(i,j);
     }
   }
 

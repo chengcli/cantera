@@ -17,13 +17,18 @@ class Condensation : public Kinetics {
       m_ROP_ok = false;
     }
     m_use_mole_fraction = true;
+    m_dt = 0.;
+    thermo().getConcentrations(m_conc0.data());
   }
 
-  void setQuantityConcentration() {
+  void setQuantityConcentration(double dt = 0.0) {
     if (m_use_mole_fraction) {
       m_ROP_ok = false;
     }
+
     m_use_mole_fraction = false;
+    m_dt = dt;
+    thermo().getConcentrations(m_conc0.data());
   }
 
   void resizeReactions() override;
@@ -69,6 +74,7 @@ class Condensation : public Kinetics {
   //! If m_use_mole_fraction is true, then it is the vector of mole fractions.
   //! If m_use_mole_fraction is false, then it is the vector of concentrations.
   Eigen::VectorXd m_conc;
+  Eigen::VectorXd m_conc0;
   Eigen::VectorXd m_intEng;
   Eigen::VectorXd m_cv;
 
@@ -80,14 +86,20 @@ class Condensation : public Kinetics {
   vector<unique_ptr<MultiRateBase>> m_interfaceRates;
   map<string, size_t> m_interfaceTypes; //!< Rate handler mapping
   
-  //! reaction index for x <=> y
+  //! reaction indices for x <=> y
   vector<size_t> m_jxy;
 
-  //! reaction index for x1 + x2 <=> y
+  //! reaction indices for x1 + x2 <=> y
   vector<size_t> m_jxxy;
 
-  //! reaction index for freezing reaction x(l) <=> x(s)
+  //! reaction indices for freezing reaction x(l) <=> x(s)
   vector<size_t> m_jyy;
+
+  //! reaction indices for slow cloud reactions
+  vector<size_t> m_jcloud;
+
+  //! reaction indices for evaporation
+  vector<size_t> m_jevap;
 
   //! rate jacobian matrix
   Eigen::MatrixXd m_jac;
@@ -100,10 +112,9 @@ class Condensation : public Kinetics {
 
   //! Current temperature of the data
   double m_temp = 0.0;
-
-  //! Buffers for partial rop results with length nReactions()
-  vector<double> m_rbuf0;
-  vector<double> m_rbuf1;
+  
+  //! Current time step
+  double m_dt = 0.0;
 };
 
 }
