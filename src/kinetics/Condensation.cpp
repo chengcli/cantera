@@ -210,8 +210,8 @@ bool Condensation::addReaction(shared_ptr<Reaction> r_base, bool resize)
   } else if (rtype == "freezing") {
     m_jyy.push_back(i);
   } else {
-    throw CanteraError("Condensation::addReaction",
-                       "Unknown reaction type '{}'", rtype);
+    //throw CanteraError("Condensation::addReaction",
+    //                   "Unknown reaction type '{}'", rtype);
   }
 
   // If necessary, add new interface MultiRate evaluator
