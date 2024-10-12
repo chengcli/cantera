@@ -146,9 +146,6 @@ void Condensation::resizeReactions()
   for (auto& rates : m_interfaceRates) {
     rates->resize(nTotalSpecies(), nReactions(), nPhases());
   }
-
-  m_jac.resize(nReactions(), nTotalSpecies());
-  m_rfn_ddT.resize(nReactions());
 }
 
 void Condensation::resizeSpecies()
@@ -160,7 +157,6 @@ void Condensation::resizeSpecies()
           " species to InterfaceKinetics after reactions have been added.");
   }
 
-  m_conc0.resize(m_kk);
   m_conc.resize(m_kk);
   m_intEng.resize(m_kk);
   m_cv.resize(m_kk);
@@ -232,6 +228,15 @@ bool Condensation::addReaction(shared_ptr<Reaction> r_base, bool resize)
 }
 
 void Condensation::updateROP() {
+  size_t nfast = m_jxy.size() + m_jxxy.size() + m_jyy.size();
+
+  //! rate jacobian matrix
+  Eigen::MatrixXd m_jac(nfast, nTotalSpecies());
+  m_jac.setZero();
+
+  //! rate jacobian with respect to temperature
+  vector<double> m_rfn_ddT(nfast);
+
   _update_rates_T(m_rfn.data(), m_rfn_ddT.data());
   if (m_use_mole_fraction) {
     _update_rates_X(m_conc.data());
@@ -242,8 +247,6 @@ void Condensation::updateROP() {
   if (m_ROP_ok) {
     return;
   }
-
-  m_jac.setZero();
 
   double pres = thermo().pressure();
   double temp = thermo().temperature();
@@ -257,10 +260,10 @@ void Condensation::updateROP() {
     //std::cout << "xgas = " << xgas << std::endl;
   }
 
-  Eigen::VectorXd b(nReactions());
-  Eigen::VectorXd b_ddT(nReactions());
-  Eigen::MatrixXd stoich(nTotalSpecies(), nReactions());
-  Eigen::MatrixXd rate_ddT(nReactions(), nTotalSpecies());
+  Eigen::VectorXd b(nfast);
+  Eigen::VectorXd b_ddT(nfast);
+  Eigen::MatrixXd stoich(nTotalSpecies(), nfast);
+  Eigen::MatrixXd rate_ddT(nfast, nTotalSpecies());
 
   b.setZero();
   b_ddT.setZero();
@@ -336,29 +339,9 @@ void Condensation::updateROP() {
     }
   }
 
-  if (m_dt > 0.) {
-    // slow cloud reactions
-    for (auto j : m_jcloud) {
-      for (int i = 0; i < nTotalSpecies(); i++)
-        stoich(i,j) = m_stoichMatrix.coeffRef(i,j);
-    }
-
-    auto& R = m_reactions[j];
-    size_t iy1 = kineticsSpeciesIndex(R->reactants.begin()->first);
-
-    b(j) = (m_conc0[iy1] - m_conc[iy1]) / m_dt - m_rfn[j] * m_conc[iy1];
-    m_jac(j, iy1) = - 1. / m_dt - m_rfn[j];
-
-    // evaporation
-    for (auto j : m_jevap) {
-      for (int i = 0; i < nTotalSpecies(); i++)
-        stoich(i,j) = m_stoichMatrix.coeffRef(i,j);
-    }
-  }
-
   // set up temperature gradient
   if (!m_use_mole_fraction) {
-    for (size_t j = 0; j != nReactions(); ++j) {
+    for (size_t j = 0; j < nfast; ++j) {
       // active reactions
       if (m_rfn[j] > 0. && b_ddT[j] != 0.0)  {
         for (size_t i = 0; i != nTotalSpecies(); ++i)
@@ -385,11 +368,38 @@ void Condensation::updateROP() {
   // scale rate down if some species becomes negative
   //Eigen::VectorXd rates = - stoich * r;
 
-  for (size_t j = 0; j != nReactions(); ++j) {
+  for (size_t j = 0; j < nfast; ++j) {
     m_ropf[j] = std::max(0., -r(j));
     m_ropr[j] = std::max(0., r(j));
     m_ropnet[j] = m_ropf[j] - m_ropr[j];
   }
+
+  ///   slow reactions  ///
+  for (size_t j = 1 + nfast; j < nReactions(); ++j) {
+    m_ropf[j] = 0.;
+    m_ropr[j] = 0.;
+    m_ropnet[j] = m_ropf[j] - m_ropr[j];
+  }
+
+  /*if (m_dt > 0.) {
+    // slow cloud reactions
+    for (auto j : m_jcloud) {
+      for (int i = 0; i < nTotalSpecies(); i++)
+        stoich(i,j) = m_stoichMatrix.coeffRef(i,j);
+
+      auto& R = m_reactions[j];
+      size_t iy1 = kineticsSpeciesIndex(R->reactants.begin()->first);
+
+      b(j) = (m_conc0[iy1] - m_conc[iy1]) / m_dt - m_rfn[j] * m_conc[iy1];
+      m_jac(j, iy1) = - 1. / m_dt - m_rfn[j];
+    }
+
+    // evaporation
+    for (auto j : m_jevap) {
+      for (int i = 0; i < nTotalSpecies(); i++)
+        stoich(i,j) = m_stoichMatrix.coeffRef(i,j);
+    }
+  }*/
 
   m_ROP_ok = true;
 }

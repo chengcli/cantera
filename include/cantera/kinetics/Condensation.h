@@ -1,6 +1,7 @@
 #ifndef CT_CONDENSATION_H
 #define CT_CONDENSATION_H
 
+#include "cantera/thermo/ThermoPhase.h"
 #include "Kinetics.h"
 
 namespace Cantera
@@ -9,7 +10,6 @@ namespace Cantera
 class Condensation : public Kinetics {
  public:
   Condensation() = default;
-
   ~Condensation() override {}
 
   void setQuantityMoleFraction() {
@@ -18,7 +18,6 @@ class Condensation : public Kinetics {
     }
     m_use_mole_fraction = true;
     m_dt = 0.;
-    thermo().getConcentrations(m_conc0.data());
   }
 
   void setQuantityConcentration(double dt = 0.0) {
@@ -28,7 +27,6 @@ class Condensation : public Kinetics {
 
     m_use_mole_fraction = false;
     m_dt = dt;
-    thermo().getConcentrations(m_conc0.data());
   }
 
   void resizeReactions() override;
@@ -74,7 +72,6 @@ class Condensation : public Kinetics {
   //! If m_use_mole_fraction is true, then it is the vector of mole fractions.
   //! If m_use_mole_fraction is false, then it is the vector of concentrations.
   Eigen::VectorXd m_conc;
-  Eigen::VectorXd m_conc0;
   Eigen::VectorXd m_intEng;
   Eigen::VectorXd m_cv;
 
@@ -100,12 +97,6 @@ class Condensation : public Kinetics {
 
   //! reaction indices for evaporation
   vector<size_t> m_jevap;
-
-  //! rate jacobian matrix
-  Eigen::MatrixXd m_jac;
-
-  //! rate jacobian with respect to temperature
-  vector<double> m_rfn_ddT;
 
   bool m_use_mole_fraction = false;
   bool m_ROP_ok = false;
