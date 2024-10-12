@@ -48,8 +48,8 @@ class Condensation : public Kinetics {
 
   void updateROP() override;
 
-  Eigen::SparseMatrix<double> netRatesOfProgress_ddCi() override;
-  Eigen::SparseMatrix<double> netRatesOfProgress_ddX() override;
+  //Eigen::SparseMatrix<double> netRatesOfProgress_ddCi() override;
+  //Eigen::SparseMatrix<double> netRatesOfProgress_ddX() override;
 
  protected:
   void _update_rates_T(double *pdata, double *pdata_ddT);
@@ -62,7 +62,7 @@ class Condensation : public Kinetics {
   //! @param ddX true: w.r.t mole fractions false: w.r.t species concentrations
   //! @return a sparse matrix of derivative contributions for each reaction of
   //! dimensions nTotalReactions by nTotalSpecies
-  Eigen::SparseMatrix<double> calculateCompositionDerivatives(
+  Eigen::MatrixXd calculateCompositionDerivatives(
       StoichManagerN& stoich, const vector<double>& in, bool ddX=true);
 
   //! This variable has two interpretations.
@@ -90,7 +90,7 @@ class Condensation : public Kinetics {
   vector<size_t> m_jyy;
 
   //! rate jacobian matrix
-  Eigen::SparseMatrix<double> m_jac;
+  Eigen::MatrixXd m_jac;
 
   //! rate jacobian with respect to temperature
   vector<double> m_rfn_ddT;
