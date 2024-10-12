@@ -1,5 +1,5 @@
-#ifndef CT_NUCLEATION_H
-#define CT_NUCLEATION_H
+#ifndef CT_EVAPORATION_H
+#define CT_EVAPORATION_H
 
 #include <functional>
 
@@ -15,13 +15,13 @@ namespace Cantera
 class AnyValue;
 class AnyMap;
 
-class NucleationRate : public ReactionRate {
+class EvaporationRate : public ReactionRate {
  public:
-  NucleationRate() = default;
-  NucleationRate(const AnyMap& node, const UnitStack& rate_units);
+  EvaporationRate() = default;
+  EvaporationRate(const AnyMap& node, const UnitStack& rate_units);
 
   unique_ptr<MultiRateBase> newMultiRate() const override {
-    return make_unique<MultiRate<NucleationRate, ArrheniusData>>();
+    return make_unique<MultiRate<EvaporationRate, ArrheniusData>>();
   }
 
   //! Set the rate parameters for this reaction.
@@ -30,7 +30,7 @@ class NucleationRate : public ReactionRate {
                          const AnyMap& node);
 
   //! return the rate coefficient type
-  const string type() const override { return "nucleation"; }
+  const string type() const override { return "evaporation"; }
 
   void getParameters(AnyMap& rateNode, const Units& rate_units=Units(0.)) const;
   using ReactionRate::getParameters;
