@@ -101,27 +101,36 @@ void IdealMoistPhase::getIntEnergy_RT_ref(double* urt) const {
 
 void IdealMoistPhase::updateFromKinetics(Kinetics& kin) 
 {
-  Composition reactants;
   m_vapor_index.resize(m_ncloud);
 
   for (size_t i = 0; i < m_ncloud; i++) {
+    Composition vapors;
+
     auto name = speciesName(m_kk - m_ncloud + i);
     for (size_t j = 0; j < kin.nReactions(); j++) {
       auto rxn = kin.reaction(j);
-      if (rxn->products.size() == 1 && rxn->products.begin()->first == name) 
-      {
+      string rtype = rxn->rate()->subType();
+      if (rtype == "") rtype = rxn->rate()->type();
+
+      if (rtype == "nucleation" && rxn->products.begin()->first == name) {
         m_rate.push_back(rxn->rate());
-        reactants = rxn->reactants;
+        vapors = rxn->reactants;
+        break;
+      }
+
+      if (rtype == "evaporation" && rxn->reactants.begin()->first == name) {
+        m_rate.push_back(rxn->rate());
+        vapors = rxn->products;
         break;
       }
     }
 
-    if (reactants.empty()) {
+    if (vapors.empty()) {
       throw CanteraError("ConstCpCloudPoly::setReaction",
-                         "No reaction found for species " + name);
+                         "No vapors found for species " + name);
     }
 
-    for (auto& [name, _] : reactants) {
+    for (auto& [name, _] : vapors) {
       m_vapor_index[i].push_back(speciesIndex(name));
     }
   }
