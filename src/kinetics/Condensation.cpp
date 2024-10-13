@@ -235,7 +235,7 @@ void Condensation::updateROP() {
   m_jac.setZero();
 
   //! rate jacobian with respect to temperature
-  vector<double> m_rfn_ddT(nfast);
+  vector<double> m_rfn_ddT(nReactions());
   m_rfn_ddT.assign(nfast, 0.);
 
   _update_rates_T(m_rfn.data(), m_rfn_ddT.data());
