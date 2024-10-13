@@ -17,13 +17,16 @@ class Condensation : public Kinetics {
       m_ROP_ok = false;
     }
     m_use_mole_fraction = true;
+    m_dt = 0.;
   }
 
-  void setQuantityConcentration() {
+  void setQuantityConcentration(double dt = 0.0) {
     if (m_use_mole_fraction) {
       m_ROP_ok = false;
     }
+
     m_use_mole_fraction = false;
+    m_dt = dt;
   }
 
   void resizeReactions() override;
@@ -48,8 +51,8 @@ class Condensation : public Kinetics {
 
   void updateROP() override;
 
-  Eigen::SparseMatrix<double> netRatesOfProgress_ddCi() override;
-  Eigen::SparseMatrix<double> netRatesOfProgress_ddX() override;
+  //Eigen::SparseMatrix<double> netRatesOfProgress_ddCi() override;
+  //Eigen::SparseMatrix<double> netRatesOfProgress_ddX() override;
 
  protected:
   void _update_rates_T(double *pdata, double *pdata_ddT);
@@ -62,7 +65,7 @@ class Condensation : public Kinetics {
   //! @param ddX true: w.r.t mole fractions false: w.r.t species concentrations
   //! @return a sparse matrix of derivative contributions for each reaction of
   //! dimensions nTotalReactions by nTotalSpecies
-  Eigen::SparseMatrix<double> calculateCompositionDerivatives(
+  Eigen::MatrixXd calculateCompositionDerivatives(
       StoichManagerN& stoich, const vector<double>& in, bool ddX=true);
 
   //! This variable has two interpretations.
@@ -80,20 +83,20 @@ class Condensation : public Kinetics {
   vector<unique_ptr<MultiRateBase>> m_interfaceRates;
   map<string, size_t> m_interfaceTypes; //!< Rate handler mapping
   
-  //! reaction index for x <=> y
+  //! reaction indices for x <=> y
   vector<size_t> m_jxy;
 
-  //! reaction index for x1 + x2 <=> y
+  //! reaction indices for x1 + x2 <=> y
   vector<size_t> m_jxxy;
 
-  //! reaction index for freezing reaction x(l) <=> x(s)
+  //! reaction indices for freezing reaction x(l) <=> x(s)
   vector<size_t> m_jyy;
 
-  //! rate jacobian matrix
-  Eigen::SparseMatrix<double> m_jac;
+  //! reaction indices for slow cloud reactions
+  vector<size_t> m_jcloud;
 
-  //! rate jacobian with respect to temperature
-  vector<double> m_rfn_ddT;
+  //! reaction indices for evaporation
+  vector<size_t> m_jevap;
 
   bool m_use_mole_fraction = false;
   bool m_ROP_ok = false;
@@ -101,9 +104,8 @@ class Condensation : public Kinetics {
   //! Current temperature of the data
   double m_temp = 0.0;
 
-  //! Buffers for partial rop results with length nReactions()
-  vector<double> m_rbuf0;
-  vector<double> m_rbuf1;
+  //! Current time step
+  double m_dt = 0.0;
 };
 
 }

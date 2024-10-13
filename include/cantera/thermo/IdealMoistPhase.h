@@ -70,6 +70,14 @@ class IdealMoistPhase : public IdealGasPhase {
 
   void updateFromKinetics(Kinetics& kin) override;
 
+  std::vector<int> vaporIndices(size_t i) const {
+    if (i < nGas()) {
+      throw CanteraError("IdealMoistPhase::vaporIndices",
+                         "Species index out of range: {}", i);
+    }
+    return m_vapor_index[i - nGas()];
+  }
+
  protected:
   /*!
    * @f[

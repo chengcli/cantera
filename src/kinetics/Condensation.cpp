@@ -24,16 +24,16 @@ inline pair<double, double> satfunc1v(double s, double x, double y,
 }
 
 inline void set_jac1v(
-    Eigen::SparseMatrix<double> &jac, double s, double const *conc,
+    Eigen::MatrixXd &jac, double s, double const *conc,
     int j, int ix, int iy)
 {
   double const& x = conc[ix];
   double const& y = conc[iy];
   double rate = x - s;
   if (rate > 0. || (rate < 0. && y > - rate)) {
-    jac.coeffRef(j, ix) = 1.;
+    jac(j, ix) = 1.;
   } else {
-    jac.coeffRef(j, iy) = -1.;
+    jac(j, iy) = -1.;
   }
 }
 
@@ -51,7 +51,7 @@ inline pair<double, double> satfunc2v(double s, double x1, double x2, double y,
 }
 
 inline void set_jac2v(
-    Eigen::SparseMatrix<double> &jac, double s, double const *conc,
+    Eigen::MatrixXd &jac, double s, double const *conc,
     int j, int ix1, int ix2, int iy)
 {
   double const& x1 = conc[ix1];
@@ -61,10 +61,10 @@ inline void set_jac2v(
   double rate = (x1 + x2 - sqrt(delta)) / 2.;
 
   if (rate > 0. || (rate < 0. && y > - rate)) {
-    jac.coeffRef(j, ix1) = (1. - (x1 - x2) / sqrt(delta)) / 2.;
-    jac.coeffRef(j, ix2) = (1. - (x2 - x1) / sqrt(delta)) / 2.;
+    jac(j, ix1) = (1. - (x1 - x2) / sqrt(delta)) / 2.;
+    jac(j, ix2) = (1. - (x2 - x1) / sqrt(delta)) / 2.;
   } else {
-    jac.coeffRef(j, iy) = -1.;
+    jac(j, iy) = -1.;
   }
 }
 
@@ -86,13 +86,13 @@ inline double satfunc1p(double s, double x, double y, double g)
   return -y;
 }
 
-inline void set_jac1p(Eigen::SparseMatrix<double> &jac, 
+inline void set_jac1p(Eigen::MatrixXd &jac, 
                       double s, double const* frac, double g,
                       int j, int ix, int iy)
 {
   // boil all condensates
   if (s > 1.) {
-    jac.coeffRef(j, iy) = -1.;
+    jac(j, iy) = -1.;
     return;
   }
 
@@ -102,9 +102,9 @@ inline void set_jac1p(Eigen::SparseMatrix<double> &jac,
   double rate = (x - s * g) / (1. - s);
 
   if (rate > 0. || (rate < 0. && y > - rate)) {
-    jac.coeffRef(j, ix) = 1.;
+    jac(j, ix) = 1.;
   } else {
-    jac.coeffRef(j, iy) = -1.;
+    jac(j, iy) = -1.;
   }
 }
 
@@ -120,7 +120,7 @@ inline double satfunc2p(double s, double x1, double x2, double y, double g)
   return -y;
 }
 
-inline void set_jac2p(Eigen::SparseMatrix<double> &jac,
+inline void set_jac2p(Eigen::MatrixXd &jac,
                       double s, double const* frac, double g,
                       int j, int ix1, int ix2, int iy)
 {
@@ -132,10 +132,10 @@ inline void set_jac2p(Eigen::SparseMatrix<double> &jac,
   double rate = (x1 + x2 - 4 * g * s - sqrt(delta)) / (2. * (1. - 4. * s));
 
   if (rate > 0. || (rate < 0. && y > - rate)) {
-    jac.coeffRef(j, ix1) = (1. - (x1 - x2) / sqrt(delta)) / 2.;
-    jac.coeffRef(j, ix2) = (1. - (x2 - x1) / sqrt(delta)) / 2.;
+    jac(j, ix1) = (1. - (x1 - x2) / sqrt(delta)) / 2.;
+    jac(j, ix2) = (1. - (x2 - x1) / sqrt(delta)) / 2.;
   } else {
-    jac.coeffRef(j, iy) = -1.;
+    jac(j, iy) = -1.;
   }
 }
 
@@ -146,8 +146,6 @@ void Condensation::resizeReactions()
   for (auto& rates : m_interfaceRates) {
     rates->resize(nTotalSpecies(), nReactions(), nPhases());
   }
-  m_jac.resize(nReactions(), nTotalSpecies());
-  m_rfn_ddT.resize(nReactions());
 }
 
 void Condensation::resizeSpecies()
@@ -209,9 +207,10 @@ bool Condensation::addReaction(shared_ptr<Reaction> r_base, bool resize)
     }
   } else if (rtype == "freezing") {
     m_jyy.push_back(i);
+  } else if (rtype == "evaporation") {
+    m_jevap.push_back(i);
   } else {
-    throw CanteraError("Condensation::addReaction",
-                       "Unknown reaction type '{}'", rtype);
+    m_jcloud.push_back(i);
   }
 
   // If necessary, add new interface MultiRate evaluator
@@ -229,6 +228,16 @@ bool Condensation::addReaction(shared_ptr<Reaction> r_base, bool resize)
 }
 
 void Condensation::updateROP() {
+  size_t nfast = m_jxy.size() + m_jxxy.size() + m_jyy.size();
+
+  //! rate jacobian matrix
+  Eigen::MatrixXd m_jac(nfast, nTotalSpecies());
+  m_jac.setZero();
+
+  //! rate jacobian with respect to temperature
+  vector<double> m_rfn_ddT(nReactions());
+  m_rfn_ddT.assign(nfast, 0.);
+
   _update_rates_T(m_rfn.data(), m_rfn_ddT.data());
   if (m_use_mole_fraction) {
     _update_rates_X(m_conc.data());
@@ -239,8 +248,6 @@ void Condensation::updateROP() {
   if (m_ROP_ok) {
     return;
   }
-
-  m_jac.setZero();
 
   double pres = thermo().pressure();
   double temp = thermo().temperature();
@@ -254,23 +261,22 @@ void Condensation::updateROP() {
     //std::cout << "xgas = " << xgas << std::endl;
   }
 
-  Eigen::VectorXd b(nReactions());
-  Eigen::VectorXd b_ddT(nReactions());
-  Eigen::SparseMatrix<double> stoich(m_stoichMatrix);
-  Eigen::SparseMatrix<double> rate_ddT(nReactions(), nTotalSpecies());
+  Eigen::VectorXd b(nfast);
+  Eigen::VectorXd b_ddT(nfast);
+  Eigen::MatrixXd stoich(nTotalSpecies(), nfast);
+  Eigen::MatrixXd rate_ddT(nfast, nTotalSpecies());
 
   b.setZero();
   b_ddT.setZero();
+  stoich.setZero();
   rate_ddT.setZero();
 
   // nucleation: x <=> y
   for (auto j : m_jxy) {
     // inactive reactions
-    if (m_rfn[j] < 0.0) {
+    if (m_rfn[j] < 0.0) continue;
       for (int i = 0; i < nTotalSpecies(); i++)
-        stoich.coeffRef(i,j) = 0.0;
-      continue;
-    }
+        stoich(i,j) = m_stoichMatrix.coeffRef(i,j);
 
     auto& R = m_reactions[j];
     size_t ix = kineticsSpeciesIndex(R->reactants.begin()->first);
@@ -291,11 +297,9 @@ void Condensation::updateROP() {
   for (auto j : m_jxxy) {
     //std::cout << "jxxy = " << j << std::endl;
     // inactive reactions
-    if (m_rfn[j] < 0.0) {
+    if (m_rfn[j] < 0.0) continue;
       for (int i = 0; i < nTotalSpecies(); i++)
-        stoich.coeffRef(i,j) = 0.0;
-      continue;
-    }
+        stoich(i,j) = m_stoichMatrix.coeffRef(i,j);
 
     auto& R = m_reactions[j];
     size_t ix1 = kineticsSpeciesIndex(R->reactants.begin()->first);
@@ -315,11 +319,9 @@ void Condensation::updateROP() {
 
   // freezing: y1 <=> y2
   for (auto j : m_jyy) {
-    if (m_rfn[j] < 0.0) {
-      for (int i = 0; i < nTotalSpecies(); i++)
-        stoich.coeffRef(i,j) = 0.0;
-      continue;
-    }
+    if (m_rfn[j] < 0.0) continue;
+    for (int i = 0; i < nTotalSpecies(); i++)
+      stoich(i,j) = m_stoichMatrix.coeffRef(i,j);
 
     auto& R = m_reactions[j];
     size_t iy1 = kineticsSpeciesIndex(R->reactants.begin()->first);
@@ -328,23 +330,23 @@ void Condensation::updateROP() {
     if (temp > m_rfn[j]) { // higher than freezing temperature
       if (m_conc[iy2] > 0.) {
         b(j) = - m_conc[iy2];
-        m_jac.coeffRef(j, iy2) = -1.;
+        m_jac(j, iy2) = -1.;
       }
     } else { // lower than freezing temperature
       if (m_conc[iy1] > 0.) {
         b(j) = m_conc[iy1];
-        m_jac.coeffRef(j, iy1) = 1.;
+        m_jac(j, iy1) = 1.;
       }
     }
   }
 
   // set up temperature gradient
   if (!m_use_mole_fraction) {
-    for (size_t j = 0; j != nReactions(); ++j) {
+    for (size_t j = 0; j < nfast; ++j) {
       // active reactions
       if (m_rfn[j] > 0. && b_ddT[j] != 0.0)  {
         for (size_t i = 0; i != nTotalSpecies(); ++i)
-          rate_ddT.coeffRef(j, i) = b_ddT[j] * m_intEng[i];
+          rate_ddT(j, i) = b_ddT[j] * m_intEng[i];
       }
     }
 
@@ -366,11 +368,60 @@ void Condensation::updateROP() {
 
   // scale rate down if some species becomes negative
   //Eigen::VectorXd rates = - stoich * r;
-
-  for (size_t j = 0; j != nReactions(); ++j) {
+  
+  for (size_t j = 0; j < nfast; ++j) {
     m_ropf[j] = std::max(0., -r(j));
     m_ropr[j] = std::max(0., r(j));
     m_ropnet[j] = m_ropf[j] - m_ropr[j];
+  }
+
+  for (size_t j = nfast; j < nReactions(); ++j) {
+    m_ropf[j] = 0.;
+    m_ropr[j] = 0.;
+    m_ropnet[j] = 0.;
+  }
+
+  if (!m_use_mole_fraction) {
+    // slow cloud reactions
+    for (auto j : m_jcloud) {
+      auto& R = m_reactions[j];
+      size_t iy1 = kineticsSpeciesIndex(R->reactants.begin()->first);
+      m_ropf[j] = m_rfn[j] * m_conc[iy1] * m_dt;
+      m_ropr[j] = 0.;
+      m_ropnet[j] = m_ropf[j];
+
+      //for (int i = 0; i < nTotalSpecies(); i++)
+      //  stoich(i,j) = m_stoichMatrix.coeffRef(i,j);
+      //b(j) = (m_conc0[iy1] - m_conc[iy1]) / m_dt - m_rfn[j] * m_conc[iy1];
+      //m_jac(j, iy1) = - 1. / m_dt - m_rfn[j];
+    }
+
+    // evaporation (only works for y <=> x)
+    for (auto j : m_jevap) {
+      auto& R = m_reactions[j];
+      size_t iy1 = kineticsSpeciesIndex(R->reactants.begin()->first);
+      auto vapors = static_cast<IdealMoistPhase&>(thermo()).vaporIndices(iy1);
+      auto ivapor = vapors[0] - 1;
+
+      // requires that the reaction indices and vapor indices are aligned
+      if (m_rfn[ivapor] > 1.) {  // boiling point
+        m_ropf[j] = m_conc[iy1];
+        m_ropr[j] = 0.;
+        m_ropnet[j] = m_ropf[j];
+      } else {
+        auto [rate, _] = satfunc1v(m_rfn[ivapor], m_conc[iy1], 0.);
+        if (rate < 0.) {
+          m_ropf[j] = - m_rfn[j] * rate * m_dt;
+          m_ropr[j] = 0.;
+          m_ropnet[j] = m_ropf[j];
+        }
+      }
+
+      //for (int i = 0; i < nTotalSpecies(); i++)
+      //  stoich(i,j) = m_stoichMatrix.coeffRef(i,j);
+      //b(j) = (m_conc0[iy1] - m_conc[iy1]) / m_dt - m_rfn[j] * m_conc[iy1];
+      //m_jac(j, iy1) = - 1. / m_dt - m_rfn[j];
+    }
   }
 
   m_ROP_ok = true;
@@ -439,7 +490,7 @@ void Condensation::_update_rates_X(double *pdata)
   m_ROP_ok = false;
 }
 
-Eigen::SparseMatrix<double> Condensation::netRatesOfProgress_ddX()
+/*Eigen::SparseMatrix<double> Condensation::netRatesOfProgress_ddX()
 {
   updateROP();
   return m_jac;
@@ -449,6 +500,6 @@ Eigen::SparseMatrix<double> Condensation::netRatesOfProgress_ddCi()
 {
   updateROP();
   return m_jac;
-}
+}*/
 
 }
