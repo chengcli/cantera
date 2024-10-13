@@ -23,6 +23,7 @@ class Condensation : public Kinetics {
     if (m_use_mole_fraction) {
       m_ROP_ok = false;
     }
+
     m_use_mole_fraction = false;
   }
 
@@ -80,30 +81,26 @@ class Condensation : public Kinetics {
   vector<unique_ptr<MultiRateBase>> m_interfaceRates;
   map<string, size_t> m_interfaceTypes; //!< Rate handler mapping
   
-  //! reaction index for x <=> y
+  //! reaction indices for x <=> y
   vector<size_t> m_jxy;
 
-  //! reaction index for x1 + x2 <=> y
+  //! reaction indices for x1 + x2 <=> y
   vector<size_t> m_jxxy;
 
-  //! reaction index for freezing reaction x(l) <=> x(s)
+  //! reaction indices for freezing reaction x(l) <=> x(s)
   vector<size_t> m_jyy;
 
-  //! rate jacobian matrix
-  Eigen::MatrixXd m_jac;
+  //! reaction indices for slow cloud reactions
+  vector<size_t> m_jcloud;
 
-  //! rate jacobian with respect to temperature
-  vector<double> m_rfn_ddT;
+  //! reaction indices for evaporation
+  vector<size_t> m_jevap;
 
   bool m_use_mole_fraction = false;
   bool m_ROP_ok = false;
 
   //! Current temperature of the data
   double m_temp = 0.0;
-
-  //! Buffers for partial rop results with length nReactions()
-  vector<double> m_rbuf0;
-  vector<double> m_rbuf1;
 };
 
 }
