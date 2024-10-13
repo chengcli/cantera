@@ -17,14 +17,16 @@ class Condensation : public Kinetics {
       m_ROP_ok = false;
     }
     m_use_mole_fraction = true;
+    m_dt = 0.;
   }
 
-  void setQuantityConcentration() {
+  void setQuantityConcentration(double dt = 0.0) {
     if (m_use_mole_fraction) {
       m_ROP_ok = false;
     }
 
     m_use_mole_fraction = false;
+    m_dt = dt;
   }
 
   void resizeReactions() override;
@@ -101,6 +103,9 @@ class Condensation : public Kinetics {
 
   //! Current temperature of the data
   double m_temp = 0.0;
+
+  //! Current time step
+  double m_dt = 0.0;
 };
 
 }

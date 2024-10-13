@@ -375,23 +375,52 @@ void Condensation::updateROP() {
     m_ropnet[j] = m_ropf[j] - m_ropr[j];
   }
 
-  /* slow cloud reactions
-  for (auto j : m_jcloud) {
-    for (int i = 0; i < nTotalSpecies(); i++)
-      stoich(i,j) = m_stoichMatrix.coeffRef(i,j);
+  for (size_t j = nfast; j < nReactions(); ++j) {
+    m_ropf[j] = 0.;
+    m_ropr[j] = 0.;
+    m_ropnet[j] = 0.;
+  }
 
-    auto& R = m_reactions[j];
-    size_t iy1 = kineticsSpeciesIndex(R->reactants.begin()->first);
+  if (!m_use_mole_fraction) {
+    // slow cloud reactions
+    for (auto j : m_jcloud) {
+      auto& R = m_reactions[j];
+      size_t iy1 = kineticsSpeciesIndex(R->reactants.begin()->first);
+      m_ropf[j] = m_rfn[j] * m_conc[iy1] * m_dt;
+      m_ropr[j] = 0.;
+      m_ropnet[j] = m_ropf[j];
 
-    b(j) = (m_conc0[iy1] - m_conc[iy1]) / m_dt - m_rfn[j] * m_conc[iy1];
-    m_jac(j, iy1) = - 1. / m_dt - m_rfn[j];
-
-    // evaporation
-    for (auto j : m_jevap) {
-      for (int i = 0; i < nTotalSpecies(); i++)
-        stoich(i,j) = m_stoichMatrix.coeffRef(i,j);
+      //for (int i = 0; i < nTotalSpecies(); i++)
+      //  stoich(i,j) = m_stoichMatrix.coeffRef(i,j);
+      //b(j) = (m_conc0[iy1] - m_conc[iy1]) / m_dt - m_rfn[j] * m_conc[iy1];
+      //m_jac(j, iy1) = - 1. / m_dt - m_rfn[j];
     }
-  }*/
+
+    /* evaporation (only works for y <=> x)
+    for (auto j : m_jevap) {
+      auto& R = m_reactions[j];
+      size_t iy1 = kineticsSpeciesIndex(R->reactants.begin()->first);
+      auto vapors = static_cast<IdealMoistPhase&>(thermo()).vaporIndices(iy1);
+      // requires that the reaction indices and vapor indices are aligned
+      if (m_rfn[vapors[0]] > 1.) {  // boiling point
+        m_ropf[j] = m_conc[iy1];
+        m_ropr[j] = 0.;
+        m_ropnet[j] = m_ropf[j];
+      } else {
+        auto [rate, _] = satfunc1v(m_rfn[vapors[0]], m_conc[iy1], 0.);
+        if (rate < 0.) {
+          m_ropf[j] = - m_rfn[j] * rate * m_dt;
+          m_ropr[j] = 0.;
+          m_ropnet[j] = m_ropf[j];
+        }
+      }
+
+      //for (int i = 0; i < nTotalSpecies(); i++)
+      //  stoich(i,j) = m_stoichMatrix.coeffRef(i,j);
+      //b(j) = (m_conc0[iy1] - m_conc[iy1]) / m_dt - m_rfn[j] * m_conc[iy1];
+      //m_jac(j, iy1) = - 1. / m_dt - m_rfn[j];
+    }*/
+  }
 
   m_ROP_ok = true;
 }

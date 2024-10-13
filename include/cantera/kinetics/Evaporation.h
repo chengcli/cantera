@@ -42,23 +42,9 @@ class EvaporationRate : public ReactionRate {
   double ddTScaledFromStruct(const ArrheniusData& shared_data) const;
 
  protected:
-  string m_formula_str = "formula";
-
-  //! returns s = svp(T)/RT or svp(T)/(RT)^2
-  std::function<double(double)> m_svp;
-
-  //! returns d(log(s))/dT
-  std::function<double(double)> m_logsvp_ddT;
-
-  size_t m_order = 1;
-
-  double m_t3 = 0.0;
-  double m_p3 = 0.0;
-  double m_beta = 0.0;
-  double m_delta = 0.0;
-
-  double m_min_temp = 0.0;
-  double m_max_temp = 1.0e30;
+  double m_A = 0.; //!< Pre-exponential factor
+  double m_b = 0.; //!< Temperature exponent
+  double m_Ea_R = 0.; //!< Activation energy in units of R
 };
 
 }

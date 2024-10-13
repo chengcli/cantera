@@ -1,7 +1,6 @@
 #include "cantera/numerics/Func1.h"
 #include "cantera/base/stringUtils.h"
 #include "cantera/kinetics/Evaporation.h"
-#include "cantera/kinetics/svp_funcs.h"
 #include "cantera/kinetics/Reaction.h"
 
 namespace Cantera
@@ -36,38 +35,18 @@ void EvaporationRate::setRateParameters(
   }
 
   auto& rate_map = rate.as<AnyMap>();
-  string svp_name = rate_map[m_formula_str].asString();
 
-  if (rate.hasKey("minT")) {
-    m_min_temp = rate_map["minT"].asDouble();
+  if (rate.hasKey("A")) {
+    m_A = rate_map["A"].asDouble();
   };
 
-  if (rate.hasKey("maxT")) {
-    m_max_temp = rate_map["maxT"].asDouble();
+  if (rate.hasKey("b")) {
+    m_b = rate_map["b"].asDouble();
   };
 
-  Reaction rtmp;
-  parseReactionEquation(rtmp, equation.asString(), node, nullptr);
-  m_order = rtmp.reactants.size();
-
-  if (svp_name == "ideal") {
-    m_t3 = rate_map["T3"].asDouble();
-    m_p3 = rate_map["P3"].asDouble();
-    m_beta = rate_map["beta"].asDouble();
-    m_delta = rate_map["delta"].asDouble();
-    m_svp = [this](double T) {
-      return m_p3 * exp((1. - m_t3 / T) * m_beta - m_delta * log(T / m_t3));
-    };
-    m_logsvp_ddT = [this](double T) {
-      return m_beta * m_t3 / (T * T) - m_delta / T;
-    };
-    if (m_delta > 0.) {
-      m_max_temp = std::min(m_max_temp, m_beta * m_t3 / m_delta);
-    }
-  } else {
-    m_svp = find_svp(rtmp.reactants, svp_name);
-    m_logsvp_ddT = find_logsvp_ddT(rtmp.reactants, svp_name);
-  }
+  if (rate.hasKey("Ea")) {
+    m_Ea_R = rate_map["Ea"].asDouble();
+  };
 
   m_valid = true;
 }
@@ -83,22 +62,15 @@ void EvaporationRate::validate(const string& equation, const Kinetics& kin)
 double EvaporationRate::evalFromStruct(const ArrheniusData& shared_data) const
 {
   double T = shared_data.temperature;
-  if (T < m_min_temp || T > m_max_temp) {
-    return -1;
-  }
-
-  double RT = GasConstant * T;
-  return m_svp(T) / pow(RT, m_order);
+  return m_A * exp(m_b * log(T) - m_Ea_R / T);
 }
 
+//! Evaluate derivative of reaction rate with respect to temperature
+//! divided by reaction rate
 double EvaporationRate::ddTScaledFromStruct(const ArrheniusData& shared_data) const
 {
   double T = shared_data.temperature;
-  if (T < m_min_temp || T > m_max_temp) {
-    return 0.;
-  }
-
-  return m_logsvp_ddT(T) - m_order / T;
+  return (m_Ea_R / T + m_b) / T * m_A * exp(m_b * log(T) - m_Ea_R / T);
 }
 
 void EvaporationRate::getParameters(AnyMap& rateNode, const Units& rate_units) const
