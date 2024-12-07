@@ -29,6 +29,10 @@ class Condensation : public Kinetics {
     m_dt = dt;
   }
 
+  void setBoiling(bool boil) {
+    m_boiling = boil;
+  }
+
   void resizeReactions() override;
 
   string kineticsType() const override {
@@ -106,6 +110,9 @@ class Condensation : public Kinetics {
 
   //! Current time step
   double m_dt = 0.0;
+
+  //! Boiling flag
+  bool m_boiling = false;
 };
 
 }

@@ -81,15 +81,15 @@ inline double handle_singularity(double s)
 inline double satfunc1p(double s, double x, double y, double g)
 {
   // boil all condensates
-  //if (s > 1.) {
-  //  return -y;
-  //}
-  s = handle_singularity(s);
+  if (s > 1.) {
+    return -y;
+  }
+  //s = handle_singularity(s);
 
   //std::cout << "s = " << s << ", x = " << x << ", y = " << y << ", g = " << g << std::endl;
 
   double rate = (x - s * g) / (1. - s);
-
+  
   if (rate > 0. || (rate < 0. && y > - rate)) {
     return rate;
   }
@@ -101,11 +101,11 @@ inline void set_jac1p(Eigen::MatrixXd &jac,
                       int j, int ix, int iy)
 {
   // boil all condensates
-  //if (s > 1.) {
-  //  jac(j, iy) = -1.;
-  //  return;
-  //}
-  s = handle_singularity(s);
+  if (s > 1.) {
+    jac(j, iy) = -1.;
+    return;
+  }
+  //s = handle_singularity(s);
 
   double const& x = frac[ix];
   double const& y = frac[iy];
@@ -415,18 +415,18 @@ void Condensation::updateROP() {
       auto ivapor = vapors[0] - 1;
 
       // requires that the reaction indices and vapor indices are aligned
-      /*if (m_rfn[ivapor] > 1.) {  // boiling point
+      if (m_boiling && (m_rfn[ivapor] > 1.)) {  // boiling point
         m_ropf[j] = m_conc[iy1];
         m_ropr[j] = 0.;
         m_ropnet[j] = m_ropf[j];
-      } else {*/
+      } else {
         auto [rate, _] = satfunc1v(m_rfn[ivapor], m_conc[iy1], 0.);
         if (rate < 0.) {
           m_ropf[j] = - m_rfn[j] * rate * m_dt;
           m_ropr[j] = 0.;
           m_ropnet[j] = m_ropf[j];
         }
-      //}
+      }
 
       //for (int i = 0; i < nTotalSpecies(); i++)
       //  stoich(i,j) = m_stoichMatrix.coeffRef(i,j);
