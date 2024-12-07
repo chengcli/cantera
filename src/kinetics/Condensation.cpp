@@ -20,7 +20,7 @@ inline pair<double, double> satfunc1v(double s, double x, double y,
   if (rate > 0. || (rate < 0. && y > - rate)) {
     return {rate, - s * logs_ddT};
   }
-  return {-y, 0.};
+  return {-y, - s * logs_ddT};
 }
 
 inline void set_jac1v(
@@ -47,7 +47,7 @@ inline pair<double, double> satfunc2v(double s, double x1, double x2, double y,
   if (rate > 0. || (rate < 0. && y > - rate)) {
     return {rate, - s * logs_ddT / sqrt(delta)};
   }
-  return {-y, 0.};
+  return {-y, - s * logs_ddT / sqrt(delta)};
 }
 
 inline void set_jac2v(
@@ -68,13 +68,23 @@ inline void set_jac2v(
   }
 }
 
+inline double handle_singularity(double s)
+{
+  if (s - 1 < 1.e-8 && s - 1 > -1.e-8) {
+    auto sgn = s > 1. ? 1. : -1.;
+    return 1. + sgn * 1.e-6;
+  }
+  return s;
+}
+
 // x -> y at constant pressure (mole fraction)
 inline double satfunc1p(double s, double x, double y, double g)
 {
   // boil all condensates
-  if (s > 1.) {
-    return -y;
-  }
+  //if (s > 1.) {
+  //  return -y;
+  //}
+  s = handle_singularity(s);
 
   //std::cout << "s = " << s << ", x = " << x << ", y = " << y << ", g = " << g << std::endl;
 
@@ -91,10 +101,11 @@ inline void set_jac1p(Eigen::MatrixXd &jac,
                       int j, int ix, int iy)
 {
   // boil all condensates
-  if (s > 1.) {
-    jac(j, iy) = -1.;
-    return;
-  }
+  //if (s > 1.) {
+  //  jac(j, iy) = -1.;
+  //  return;
+  //}
+  s = handle_singularity(s);
 
   double const& x = frac[ix];
   double const& y = frac[iy];
@@ -404,18 +415,18 @@ void Condensation::updateROP() {
       auto ivapor = vapors[0] - 1;
 
       // requires that the reaction indices and vapor indices are aligned
-      if (m_rfn[ivapor] > 1.) {  // boiling point
+      /*if (m_rfn[ivapor] > 1.) {  // boiling point
         m_ropf[j] = m_conc[iy1];
         m_ropr[j] = 0.;
         m_ropnet[j] = m_ropf[j];
-      } else {
+      } else {*/
         auto [rate, _] = satfunc1v(m_rfn[ivapor], m_conc[iy1], 0.);
         if (rate < 0.) {
           m_ropf[j] = - m_rfn[j] * rate * m_dt;
           m_ropr[j] = 0.;
           m_ropnet[j] = m_ropf[j];
         }
-      }
+      //}
 
       //for (int i = 0; i < nTotalSpecies(); i++)
       //  stoich(i,j) = m_stoichMatrix.coeffRef(i,j);
