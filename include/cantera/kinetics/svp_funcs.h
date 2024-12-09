@@ -4,6 +4,7 @@
 #include "vapors/water_vapors.hpp"
 #include "vapors/ammonia_vapors.hpp"
 #include "vapors/ammonium_hydrosulfide_vapors.hpp"
+#include "vapors/silicon_dioxide_vapors.hpp"
 
 namespace Cantera
 {
