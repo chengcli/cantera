@@ -31,6 +31,8 @@ std::function<double(double)> find_svp(const Composition& reactants,
     return svp_h2o_Antoine;
   } else if (name == "NH3-antoine") {
     return svp_nh3_Antoine;
+  } else if (name == "SiO-visscher") {
+    return svp_sio_Visscher;
   }
 
   throw CanteraError("find_svp",
@@ -48,6 +50,8 @@ std::function<double(double)> find_logsvp_ddT(const Composition& reactants,
     return nullptr; // logsvp_ddT_h2o_Antoine;
   } else if (name == "NH3-antoine") {
     return nullptr; // logsvp_ddT_nh3_Antoine;
+  } else if (name == "SiO-visscher") {
+    return svp_sio_Visscher_logsvp_ddT;
   }
 
   throw CanteraError("find_logsvp_ddT",
